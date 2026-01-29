@@ -16,7 +16,7 @@ def img_to_base64(path: Path) -> str:
     return base64.b64encode(data).decode("utf-8")
 
 
-def logo_strip_html(paths, height_px=44, gap_px=10):
+def logo_strip_html(paths, height_px=42, gap_px=10):
     imgs = []
     for p in paths:
         b64 = img_to_base64(p)
@@ -27,8 +27,10 @@ def logo_strip_html(paths, height_px=44, gap_px=10):
             f'style="height:{height_px}px; width:auto; object-fit:contain;" />'
         )
     return f"""
-    <div class="logo-strip" style="gap:{gap_px}px;">
-      {''.join(imgs)}
+    <div class="logo-wrap">
+      <div class="logo-strip" style="gap:{gap_px}px;">
+        {''.join(imgs)}
+      </div>
     </div>
     """
 
@@ -95,11 +97,11 @@ COEF = {
 
 # -------------------- ENGLISH OPTIONS --------------------
 OPTIONS = {
-    "Gender": ["Man", "Woman"],  # dummy(1)=1 if Woman
-    "Nationality": ["Malaysian citizen", "Non-Malaysian citizen"],  # dummy(1)=1 if Non-Malaysian
-    "Ethnicity": ["Malay", "Chinese", "Indian", "Sabah", "Sarawak"],  # 0..4 -> dummies (1..4)
-    "Religion": ["Islam", "Buddhism", "Hinduism", "Others"],  # 0..3 -> dummies (1..3)
-    "Marital Status": ["Single", "Married", "Widowed", "Divorced", "Separated"],  # 0..4 -> dummies (1..4)
+    "Gender": ["Man", "Woman"],
+    "Nationality": ["Malaysian citizen", "Non-Malaysian citizen"],
+    "Ethnicity": ["Malay", "Chinese", "Indian", "Sabah", "Sarawak"],
+    "Religion": ["Islam", "Buddhism", "Hinduism", "Others"],
+    "Marital Status": ["Single", "Married", "Widowed", "Divorced", "Separated"],
     "Education Level": [
         "No certificate",
         "UPSR",
@@ -110,7 +112,7 @@ OPTIONS = {
         "Certificate (Polytechnic/University)",
         "Diploma",
         "Bachelor's Degree",
-    ],  # 0..8 -> dummies (1..8)
+    ],
     "Occupation": [
         "Unemployed",
         "Government employee",
@@ -119,10 +121,10 @@ OPTIONS = {
         "Homemaker",
         "Student",
         "Government retiree",
-    ],  # 0..6 -> dummies (1..6)
-    "Household Size": ["1 person", "2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummies (1..4)
-    "Number of Dependents": ["None", "1–2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummies (1..4)
-    # NOTE: House + Room REMOVED from UI (keep original codes)
+    ],
+    "Household Size": ["1 person", "2 people", "3–4 people", "5–6 people", "7 people or more"],
+    "Number of Dependents": ["None", "1–2 people", "3–4 people", "5–6 people", "7 people or more"],
+    # House + Room removed (keep original codes)
     "Type of Rental Housing (labels)": [
         "Flat",
         "Apartment",
@@ -132,7 +134,7 @@ OPTIONS = {
         "One-unit house",
     ],
     "Type of Rental Housing (codes)": [2, 3, 4, 5, 6, 7],
-    "Furnished Type": ["None", "Furnished"],  # dummy(1)=1 if Furnished
+    "Furnished Type": ["None", "Furnished"],
     "Deposit": [
         "No deposit",
         "1 + 1",
@@ -141,9 +143,9 @@ OPTIONS = {
         "1 + 1 + utility",
         "2 + 1 + utility",
         "3 + 1 + utility",
-    ],  # 0..6 -> dummies (1..6)
-    "Total years renting": ["Less than 6 months", "Less than 1 year", "1–2 years", "3–5 years", "6–10 years"],  # 0..4 -> dummies (1..4)
-    "Known SMART SEWA": ["Yes", "No"],  # dummy(1)=1 if No
+    ],
+    "Total years renting": ["Less than 6 months", "Less than 1 year", "1–2 years", "3–5 years", "6–10 years"],
+    "Known SMART SEWA": ["Yes", "No"],
 }
 
 
@@ -166,7 +168,7 @@ def build_inputs(
     job_idx: int,
     household_idx: int,
     dep_idx: int,
-    rental_code: int,  # original code (2..7) after removing House/Room
+    rental_code: int,
     furnish_idx: int,
     deposit_idx: int,
     years_idx: int,
@@ -194,7 +196,6 @@ def build_inputs(
     for k in range(1, 5):
         inp[f"Bilangan tanggungan({k})"] = 1.0 if dep_idx == k else 0.0
 
-    # Model has Jenis rumah sewa(1..5). If rental_code is 6 or 7 -> base (zeros).
     for k in range(1, 6):
         inp[f"Jenis rumah sewa({k})"] = 1.0 if rental_code == k else 0.0
 
@@ -205,7 +206,6 @@ def build_inputs(
     for k in range(1, 5):
         inp[f"Berapa lama anda telah menyewa rumah({k})"] = 1.0 if years_idx == k else 0.0
 
-    # (1) means "No"
     inp["Adakah anda mengetahui terdapat skim mampu sewa di Malaysia? (contoh: SMART sewa)(1)"] = 1.0 if smart_idx == 1 else 0.0
     return inp
 
@@ -216,7 +216,7 @@ def compute_table(inputs: dict):
         x = float(inputs.get(var, 0.0))
         rows.append({"Variable": var, "COEF": float(coef), "INPUT": x, "COEF×INPUT": float(coef) * x})
     df = pd.DataFrame(rows)
-    z = float(df["COEF×INPUT"].sum())  # EXACT SUM OF COLUMN
+    z = float(df["COEF×INPUT"].sum())
     p = float(logistic(z))
     return df, z, p
 
@@ -239,7 +239,7 @@ with top_l:
     )
 
 with top_r:
-    st.markdown(logo_strip_html(logo_paths, height_px=44, gap_px=10), unsafe_allow_html=True)
+    st.markdown(logo_strip_html(logo_paths, height_px=40, gap_px=10), unsafe_allow_html=True)
     dark_mode = st.toggle("Dark mode", value=True)
 
 # ======================== THEME ========================
@@ -256,14 +256,12 @@ else:
     TXT = "#111827"
     MUTED = "rgba(17,24,39,.70)"
 
-# Always keep widget inputs WHITE because fields are dark in both modes
 WIDGET_TEXT = "#f8fafc"
-DROPDOWN_BG = "rgba(17, 24, 39, 0.98)"  # menu bg (always dark)
+DROPDOWN_BG = "rgba(17, 24, 39, 0.98)"
 
 st.markdown(
     f"""
 <style>
-  /* Remove Streamlit top header bar space that overlaps */
   header[data-testid="stHeader"] {{ display: none !important; }}
   div[data-testid="stToolbar"] {{ display: none !important; }}
   #MainMenu {{ visibility: hidden; }}
@@ -286,112 +284,68 @@ st.markdown(
   h1,h2,h3,h4,h5,h6, p, div, span, label, small {{
     color: {TXT} !important;
   }}
-  .muted {{ color: {MUTED} !important; }}
 
-  /* ===== Header logos (tight, ngam-ngam) ===== */
-  .logo-strip {{
+  /* ===== LOGO: ngam ngam, no long grey bar ===== */
+  .logo-wrap {{
     display:flex;
     justify-content:flex-end;
+  }}
+  .logo-strip {{
+    display:inline-flex;          /* shrink to content */
     align-items:center;
     flex-wrap: nowrap;
-    padding: 2px 6px;                      /* tight */
+    padding: 2px 6px;
     border-radius: 12px;
     border: 1px solid {BORDER};
     background: rgba(255,255,255,0.55);
-    box-shadow: none;
-    line-height: 0;                         /* remove extra height */
+    line-height: 0;
+    width: fit-content;
+    max-width: 100%;
   }}
-  .logo-strip .logo-img {{
+  .logo-img {{
     display:block;
   }}
 
-  /* ===== Chips ===== */
-  .chip {{
-    display:inline-block;
-    padding: 6px 12px;
-    border-radius: 999px;
-    font-weight: 800;
-    font-size: 12px;
-    border: 1px solid rgba(17,24,39,.12);
-    background: rgba(255,255,255,.78);
-    color: #111827 !important;
-  }}
-  .chip.ok {{
-    border-color: rgba(16,185,129,.35);
-    color: #065f46 !important;
-    background: rgba(209,250,229,.90);
-  }}
-  .chip.no {{
-    border-color: rgba(239,68,68,.35);
-    color: #7f1d1d !important;
-    background: rgba(254,226,226,.92);
-  }}
-
-  /* ===== Keep ALL widget input text white (number inputs, selects, etc.) ===== */
+  /* Widget text always white */
   .stNumberInput input, .stTextInput input, .stTextArea textarea {{
     color: {WIDGET_TEXT} !important;
     -webkit-text-fill-color: {WIDGET_TEXT} !important;
-    caret-color: {WIDGET_TEXT} !important;
   }}
-
-  /* Select (closed state) */
   [data-baseweb="select"] * {{
     color: {WIDGET_TEXT} !important;
     -webkit-text-fill-color: {WIDGET_TEXT} !important;
   }}
-  [data-baseweb="select"] input {{
-    color: {WIDGET_TEXT} !important;
-    -webkit-text-fill-color: {WIDGET_TEXT} !important;
-  }}
 
-  /* Select dropdown menu (open state) — FORCE WHITE TEXT even in light mode */
+  /* Dropdown menu open */
+  [data-baseweb="menu"], ul[role="listbox"] {{
+    background: {DROPDOWN_BG} !important;
+  }}
   [data-baseweb="popover"] * {{
     color: {WIDGET_TEXT} !important;
     -webkit-text-fill-color: {WIDGET_TEXT} !important;
-  }}
-  [data-baseweb="menu"] {{
-    background: {DROPDOWN_BG} !important;
-  }}
-  ul[role="listbox"] {{
-    background: {DROPDOWN_BG} !important;
-  }}
-  li[role="option"] {{
-    background: transparent !important;
   }}
   li[role="option"]:hover {{
     background: rgba(167, 139, 250, 0.14) !important;
   }}
 
-  /* DataFrame text color (table) */
+  /* DataFrame text white */
   div[data-testid="stDataFrame"] * {{
     color: {WIDGET_TEXT} !important;
   }}
 
-  /* FORCE button text to white in BOTH dark + light mode */
+  /* Buttons text white */
   div.stButton > button,
   div.stDownloadButton > button {{
     color: #ffffff !important;
+    background: rgba(17, 24, 39, 0.92) !important;
+    border: 1px solid {BORDER} !important;
+    border-radius: 14px !important;
+    padding: 12px 14px !important;
   }}
   div.stButton > button * ,
   div.stDownloadButton > button * {{
     color: #ffffff !important;
     -webkit-text-fill-color: #ffffff !important;
-  }}
-  div.stButton > button {{
-    background: rgba(17, 24, 39, 0.92) !important;
-    border: 1px solid {BORDER} !important;
-    border-radius: 14px !important;
-    padding: 12px 14px !important;
-  }}
-  div.stDownloadButton > button {{
-    background: rgba(17, 24, 39, 0.92) !important;
-    border: 1px solid {BORDER} !important;
-    border-radius: 14px !important;
-    padding: 12px 14px !important;
-  }}
-  div.stButton > button:hover,
-  div.stDownloadButton > button:hover {{
-    filter: brightness(1.05);
   }}
 </style>
 """,
@@ -425,14 +379,8 @@ with left:
         household = st.selectbox("Household Size", OPTIONS["Household Size"], index=0)
         dependents = st.selectbox("Number of Dependents", OPTIONS["Number of Dependents"], index=0)
 
-        rental_label = st.selectbox(
-            "Type of Rental Housing",
-            OPTIONS["Type of Rental Housing (labels)"],
-            index=0,
-        )
-        rental_code = OPTIONS["Type of Rental Housing (codes)"][
-            OPTIONS["Type of Rental Housing (labels)"].index(rental_label)
-        ]
+        rental_label = st.selectbox("Type of Rental Housing", OPTIONS["Type of Rental Housing (labels)"], index=0)
+        rental_code = OPTIONS["Type of Rental Housing (codes)"][OPTIONS["Type of Rental Housing (labels)"].index(rental_label)]
 
         furnished = st.selectbox("Furnished Type", OPTIONS["Furnished Type"], index=0)
         deposit = st.selectbox("Deposit", OPTIONS["Deposit"], index=0)
@@ -516,9 +464,9 @@ with right:
         st.markdown(
             f"""
 <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
-  <div><b>Condition A (p ≥ 0.5)</b>: {chip(res["cond_a"], res["ok_a"])}</div>
-  <div><b>Condition B (Rent ≤ {res["ratio"]:.2f}×Income)</b>: {chip(res["cond_b"], res["ok_b"])}</div>
-  <div><b>Overall</b>: {chip(res["overall"], res["ok_all"])}</div>
+  <div><b>Condition A (p ≥ 0.5)</b>: {chip("Afford" if res["ok_a"] else "Not Afford", res["ok_a"])}</div>
+  <div><b>Condition B (Rent ≤ {res["ratio"]:.2f}×Income)</b>: {chip("Afford" if res["ok_b"] else "Not Afford", res["ok_b"])}</div>
+  <div><b>Overall</b>: {chip("Afford" if res["ok_all"] else "Not Afford", res["ok_all"])}</div>
 </div>
 """,
             unsafe_allow_html=True,
