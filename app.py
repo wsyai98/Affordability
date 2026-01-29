@@ -3,24 +3,8 @@ import math
 import pandas as pd
 import streamlit as st
 
-# ==========================================================
-# Rental Affordability Checker (English UI)
-# ----------------------------------------------------------
-# Condition A (Logistic model):
-#   z = SUM(COEF × INPUT)   <-- EXACT sum of the COEF×INPUT column
-#   p = 1 / (1 + exp(-z))
-#   Afford if p >= 0.5
-#
-# Condition B (Rent-to-Income rule):
-#   Afford if Rent <= ratio * Income   (default ratio = 0.38)
-#
-# Overall:
-#   Afford only if BOTH conditions are Afford
-# ==========================================================
-
 st.set_page_config(page_title="Rental Affordability Checker", layout="wide")
 
-# -------------------- COEFFICIENTS --------------------
 COEF = {
     "Umur": -0.006,
     "Jantina ketua keluarga(1)": 0.04,
@@ -78,13 +62,12 @@ COEF = {
     "Constant": 38.956,
 }
 
-# -------------------- ENGLISH OPTIONS --------------------
 OPTIONS = {
-    "Gender": ["Man", "Woman"],  # dummy(1)=1 if Woman
-    "Nationality": ["Malaysian citizen", "Non-Malaysian citizen"],  # dummy(1)=1 if Non-Malaysian
-    "Ethnicity": ["Malay", "Chinese", "Indian", "Sabah", "Sarawak"],  # 0..4 -> dummies (1..4)
-    "Religion": ["Islam", "Buddhism", "Hinduism", "Others"],          # 0..3 -> dummies (1..3)
-    "Marital Status": ["Single", "Married", "Widowed", "Divorced", "Separated"],  # 0..4 -> dummies (1..4)
+    "Gender": ["Man", "Woman"],
+    "Nationality": ["Malaysian citizen", "Non-Malaysian citizen"],
+    "Ethnicity": ["Malay", "Chinese", "Indian", "Sabah", "Sarawak"],
+    "Religion": ["Islam", "Buddhism", "Hinduism", "Others"],
+    "Marital Status": ["Single", "Married", "Widowed", "Divorced", "Separated"],
     "Education Level": [
         "No certificate",
         "UPSR",
@@ -95,7 +78,7 @@ OPTIONS = {
         "Certificate (Polytechnic/University)",
         "Diploma",
         "Bachelor's Degree",
-    ],  # 0..8 -> dummies (1..8)
+    ],
     "Occupation": [
         "Unemployed",
         "Government employee",
@@ -104,11 +87,11 @@ OPTIONS = {
         "Homemaker",
         "Student",
         "Government retiree",
-    ],  # 0..6 -> dummies (1..6)
-    "Household Size": ["1 person", "2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummies (1..4)
-    "Number of Dependents": ["None", "1–2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummies (1..4)
+    ],
+    "Household Size": ["1 person", "2 people", "3–4 people", "5–6 people", "7 people or more"],
+    "Number of Dependents": ["None", "1–2 people", "3–4 people", "5–6 people", "7 people or more"],
 
-    # ✅ removed "House" and "Room"
+    # removed House + Room
     "Type of Rental Housing": [
         "Flat",
         "Apartment",
@@ -116,23 +99,14 @@ OPTIONS = {
         "Terrace House (Single storey)",
         "Terrace House (Double storey)",
         "One-unit house",
-    ],  # 0..5 -> model has dummies (1..5) only; base is idx=0
+    ],  # idx 0..5, model uses dummies 1..5
 
-    "Furnished Type": ["None", "Furnished"],  # dummy(1)=1 if Furnished
-    "Deposit": [
-        "No deposit",
-        "1 + 1",
-        "2 + 1",
-        "3 + 1",
-        "1 + 1 + utility",
-        "2 + 1 + utility",
-        "3 + 1 + utility",
-    ],  # 0..6 -> dummies (1..6)
-    "Total years renting": ["Less than 6 months", "Less than 1 year", "1–2 years", "3–5 years", "6–10 years"],  # 0..4 -> dummies (1..4)
-    "Known SMART SEWA": ["Yes", "No"],  # dummy(1)=1 if No
+    "Furnished Type": ["None", "Furnished"],
+    "Deposit": ["No deposit", "1 + 1", "2 + 1", "3 + 1", "1 + 1 + utility", "2 + 1 + utility", "3 + 1 + utility"],
+    "Total years renting": ["Less than 6 months", "Less than 1 year", "1–2 years", "3–5 years", "6–10 years"],
+    "Known SMART SEWA": ["Yes", "No"],
 }
 
-# -------------------- logistic (stable) --------------------
 def logistic(z: float) -> float:
     if z >= 0:
         ez = math.exp(-z)
@@ -140,7 +114,6 @@ def logistic(z: float) -> float:
     ez = math.exp(z)
     return ez / (1.0 + ez)
 
-# -------------------- Build INPUTs --------------------
 def build_inputs(
     age: int,
     gender_idx: int,
@@ -186,9 +159,7 @@ def build_inputs(
     for k in range(1, 5):
         inp[f"Bilangan tanggungan({k})"] = 1.0 if dep_idx == k else 0.0
 
-    # Rental housing: model only has Jenis rumah sewa(1..5)
-    # Our dropdown base is idx=0 (Flat) => all zeros (base)
-    # idx=1..5 map to Jenis rumah sewa(1..5)
+    # rental_idx: base=0 => all zeros; idx 1..5 => dummy(1..5)
     for k in range(1, 6):
         inp[f"Jenis rumah sewa({k})"] = 1.0 if rental_idx == k else 0.0
 
@@ -200,18 +171,16 @@ def build_inputs(
     for k in range(1, 5):
         inp[f"Berapa lama anda telah menyewa rumah({k})"] = 1.0 if years_idx == k else 0.0
 
-    # (1) means "No"
     inp["Adakah anda mengetahui terdapat skim mampu sewa di Malaysia? (contoh: SMART sewa)(1)"] = 1.0 if smart_idx == 1 else 0.0
     return inp
 
-# -------------------- Compute table + z + p --------------------
 def compute_table(inputs: dict):
     rows = []
     for var, coef in COEF.items():
         x = float(inputs.get(var, 0.0))
         rows.append({"Variable": var, "COEF": float(coef), "INPUT": x, "COEF×INPUT": float(coef) * x})
     df = pd.DataFrame(rows)
-    z = float(df["COEF×INPUT"].sum())  # ✅ EXACT SUM OF COLUMN
+    z = float(df["COEF×INPUT"].sum())
     p = float(logistic(z))
     return df, z, p
 
@@ -239,7 +208,6 @@ else:
     DF_TXT = "#111827"
     MUTED = "rgba(17,24,39,.70)"
 
-# Widgets stay DARK in both modes -> force widget text WHITE always
 WIDGET_BG = "rgba(17, 24, 39, 0.92)"
 WIDGET_BORDER = "rgba(167, 139, 250, 0.22)"
 WIDGET_TEXT = "#f8fafc"
@@ -247,7 +215,6 @@ WIDGET_TEXT = "#f8fafc"
 st.markdown(
     f"""
 <style>
-  /* ✅ remove the top Streamlit header/decoration bar that overlaps */
   header[data-testid="stHeader"] {{ display: none !important; }}
   div[data-testid="stDecoration"] {{ display: none !important; }}
   div[data-testid="stToolbar"] {{ display: none !important; }}
@@ -294,12 +261,11 @@ st.markdown(
     background: rgba(254,226,226,.92);
   }}
 
-  /* DataFrame text color */
   div[data-testid="stDataFrame"] * {{
     color: {DF_TXT} !important;
   }}
 
-  /* ✅ FORCE widget (inputs/selects) text WHITE in BOTH modes */
+  /* widgets */
   .stNumberInput div[data-baseweb="input"] {{
     background: {WIDGET_BG} !important;
     border: 1px solid {WIDGET_BORDER} !important;
@@ -320,7 +286,6 @@ st.markdown(
     color: {WIDGET_TEXT} !important;
   }}
 
-  /* dropdown menu */
   ul[role="listbox"] {{
     background: {WIDGET_BG} !important;
     border: 1px solid {WIDGET_BORDER} !important;
@@ -329,8 +294,8 @@ st.markdown(
     color: {WIDGET_TEXT} !important;
   }}
 
-  /* +/- buttons on number input */
-  .stNumberInput button {{
+  /* ✅ FIX: only color +/- buttons inside number input, NOT every button */
+  .stNumberInput div[data-baseweb="input"] button {{
     color: {WIDGET_TEXT} !important;
   }}
 </style>
@@ -341,7 +306,6 @@ st.markdown(
 def chip(label: str, ok: bool) -> str:
     return f'<span class="chip {"ok" if ok else "no"}">{label}</span>'
 
-# ======================== LAYOUT ========================
 left, right = st.columns([1, 1.35], gap="large")
 
 with left:
@@ -381,7 +345,6 @@ with left:
     run = st.button("✅ Run Check", use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ======================== RESULTS (ONLY AFTER RUN) ========================
 if "result" not in st.session_state:
     st.session_state["result"] = None
 
@@ -397,7 +360,7 @@ if run:
         job_idx=OPTIONS["Occupation"].index(job),
         household_idx=OPTIONS["Household Size"].index(household),
         dep_idx=OPTIONS["Number of Dependents"].index(dependents),
-        rental_idx=OPTIONS["Type of Rental Housing"].index(rental),  # 0..5
+        rental_idx=OPTIONS["Type of Rental Housing"].index(rental),
         furnish_idx=OPTIONS["Furnished Type"].index(furnished),
         deposit_idx=OPTIONS["Deposit"].index(deposit),
         years_idx=OPTIONS["Total years renting"].index(years),
@@ -405,16 +368,10 @@ if run:
     )
 
     df, z, p = compute_table(inputs)
-
     ok_a = p >= 0.5
-    cond_a = "Afford" if ok_a else "Not Afford"
-
     threshold = ratio * income
     ok_b = rent <= threshold
-    cond_b = "Afford" if ok_b else "Not Afford"
-
     ok_all = ok_a and ok_b
-    overall = "Afford" if ok_all else "Not Afford"
 
     st.session_state["result"] = {
         "df": df,
@@ -427,9 +384,9 @@ if run:
         "ok_a": ok_a,
         "ok_b": ok_b,
         "ok_all": ok_all,
-        "cond_a": cond_a,
-        "cond_b": cond_b,
-        "overall": overall,
+        "cond_a": "Afford" if ok_a else "Not Afford",
+        "cond_b": "Afford" if ok_b else "Not Afford",
+        "overall": "Afford" if ok_all else "Not Afford",
     }
 
 res = st.session_state["result"]
