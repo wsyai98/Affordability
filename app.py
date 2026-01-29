@@ -1,6 +1,4 @@
-from pathlib import Path
-
-code = r'''# app.py
+# app.py
 import math
 import pandas as pd
 import streamlit as st
@@ -9,7 +7,7 @@ import streamlit as st
 # Rental Affordability Checker (English UI)
 # ----------------------------------------------------------
 # Condition A (Logistic model):
-#   z = SUM(COEF * INPUT)   <-- IMPORTANT: this is the sum of the COEF*INPUT column
+#   z = SUM(COEF * INPUT)   <-- EXACTLY sum of COEF×INPUT column
 #   p = 1 / (1 + exp(-z))
 #   Afford if p >= 0.5
 #
@@ -93,7 +91,7 @@ COEF = {
     "Constant": 38.956,
 }
 
-# -------------------- ENGLISH OPTIONS (match your coding index) --------------------
+# -------------------- ENGLISH OPTIONS (coded by index like your sheet) --------------------
 OPTIONS = {
     "Gender": ["Man", "Woman"],  # dummy(1)=1 if Woman
     "Nationality": ["Malaysian citizen", "Non-Malaysian citizen"],  # dummy(1)=1 if Non-Malaysian
@@ -136,7 +134,7 @@ OPTIONS = {
         "Terrace House (Single storey)",
         "Terrace House (Double storey)",
         "One-unit house",
-    ],  # 0..7 -> model has dummies (1..5) only; others treated as base (0)
+    ],  # 0..7 -> model has dummies (1..5) only; others treated as base
 
     "Furnished Type": ["None", "Furnished"],  # dummy(1)=1 if Furnished
 
@@ -155,7 +153,7 @@ OPTIONS = {
     "Known SMART SEWA": ["Yes", "No"],  # dummy(1)=1 if No
 }
 
-# -------------------- numerically-stable logistic --------------------
+# -------------------- logistic (stable) --------------------
 def logistic(z: float) -> float:
     if z >= 0:
         ez = math.exp(-z)
@@ -163,7 +161,7 @@ def logistic(z: float) -> float:
     ez = math.exp(z)
     return ez / (1.0 + ez)
 
-# -------------------- Build INPUT vector (0/1 dummies + age + constant=1) --------------------
+# -------------------- Build INPUTs (age + dummies + constant=1) --------------------
 def build_inputs(
     age: int,
     gender_idx: int,
@@ -209,6 +207,7 @@ def build_inputs(
     for k in range(1, 5):
         inp[f"Bilangan tanggungan({k})"] = 1.0 if dep_idx == k else 0.0
 
+    # Model has Jenis rumah sewa(1..5). If user picks idx 6/7 => treated as base (all zeros)
     for k in range(1, 6):
         inp[f"Jenis rumah sewa({k})"] = 1.0 if rental_idx == k else 0.0
 
@@ -220,12 +219,13 @@ def build_inputs(
     for k in range(1, 5):
         inp[f"Berapa lama anda telah menyewa rumah({k})"] = 1.0 if years_idx == k else 0.0
 
+    # (1) means "No" per your dummy
     inp["Adakah anda mengetahui terdapat skim mampu sewa di Malaysia? (contoh: SMART sewa)(1)"] = 1.0 if smart_idx == 1 else 0.0
 
     return inp
 
-# -------------------- Compute table + (z,p) --------------------
-def compute_table(inputs: dict) -> tuple[pd.DataFrame, float, float]:
+# -------------------- Compute table + z + p --------------------
+def compute_table(inputs: dict):
     rows = []
     for var, coef in COEF.items():
         x = float(inputs.get(var, 0.0))
@@ -238,12 +238,11 @@ def compute_table(inputs: dict) -> tuple[pd.DataFrame, float, float]:
             }
         )
     df = pd.DataFrame(rows)
-    # z is EXACTLY the sum of COEF×INPUT column:
-    z = float(df["COEF×INPUT"].sum())
+    z = float(df["COEF×INPUT"].sum())  # IMPORTANT: EXACT SUM OF COLUMN
     p = float(logistic(z))
     return df, z, p
 
-# ======================== TOP BAR (toggle on top) ========================
+# ======================== TOP BAR ========================
 top_l, top_r = st.columns([0.78, 0.22], vertical_alignment="center")
 with top_l:
     st.markdown("## Rental Affordability Checker")
@@ -256,14 +255,14 @@ if dark_mode:
     PAGE_BG = "linear-gradient(180deg, #0b0b14 0%, #0b0b14 45%, #1a102b 100%)"
     CARD_BG = "rgba(17, 24, 39, 0.68)"
     BORDER = "rgba(167, 139, 250, 0.22)"
-    TXT = "#f8fafc"  # white
-    DF_TXT = "#e5e7eb"
+    TXT = "#f8fafc"     # white
+    DF_TXT = "#e5e7eb"  # dataframe text
     MUTED = "rgba(248,250,252,.75)"
 else:
     PAGE_BG = "linear-gradient(180deg, #f7f2ff 0%, #f7f2ff 45%, #efe6ff 100%)"
     CARD_BG = "rgba(255,255,255,0.84)"
     BORDER = "rgba(139, 92, 246, 0.20)"
-    TXT = "#111827"  # black-ish
+    TXT = "#111827"     # black
     DF_TXT = "#111827"
     MUTED = "rgba(17,24,39,.70)"
 
@@ -276,7 +275,6 @@ st.markdown(
   }}
   .block-container {{ padding-top: .75rem; }}
 
-  /* Cards */
   .purple-card {{
     background: {CARD_BG};
     border: 1px solid {BORDER};
@@ -285,15 +283,11 @@ st.markdown(
     box-shadow: 0 12px 30px rgba(76, 29, 149, 0.10);
   }}
 
-  /* Force label/text colors */
   h1,h2,h3,h4,h5,h6, p, div, span, label, small {{
     color: {TXT} !important;
   }}
-  .muted {{
-    color: {MUTED} !important;
-  }}
+  .muted {{ color: {MUTED} !important; }}
 
-  /* Chips */
   .chip {{
     display:inline-block;
     padding: 6px 12px;
@@ -315,7 +309,7 @@ st.markdown(
     background: rgba(254,226,226,.92);
   }}
 
-  /* DataFrame text */
+  /* DataFrame text color */
   div[data-testid="stDataFrame"] * {{
     color: {DF_TXT} !important;
   }}
@@ -327,7 +321,7 @@ st.markdown(
 def chip(label: str, ok: bool) -> str:
     return f'<span class="chip {"ok" if ok else "no"}">{label}</span>'
 
-# ======================== INPUTS ========================
+# ======================== LAYOUT ========================
 left, right = st.columns([1, 1.35], gap="large")
 
 with left:
@@ -356,7 +350,6 @@ with left:
 
     st.divider()
     st.subheader("Income & Rent Inputs")
-
     c1, c2, c3 = st.columns(3)
     with c1:
         income = st.number_input("Monthly Income (RM)", min_value=0.0, value=6000.0, step=100.0)
@@ -463,10 +456,6 @@ with right:
 - Condition A: `IF( p >= 0.5 , "Afford" , "Not Afford")`
 - Condition B: `IF( Rent <= ratio×Income , "Afford" , "Not Afford")`
 - Overall: `IF( AND(ConditionA, ConditionB) , "Afford" , "Not Afford")`
-""",
+"""
         )
         st.markdown("</div>", unsafe_allow_html=True)
-'''
-Path("/mnt/data/app.py").write_text(code, encoding="utf-8")
-"/mnt/data/app.py written"
-
