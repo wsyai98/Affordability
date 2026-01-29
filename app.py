@@ -25,17 +25,18 @@ def img_to_base64(path: Path) -> str:
     data = path.read_bytes()
     return base64.b64encode(data).decode("utf-8")
 
-def logo_strip_html(paths, height_px=44, gap_px=14):
+def logo_strip_html(paths, height_px=52, gap_px=12):
     imgs = []
     for p in paths:
         b64 = img_to_base64(p)
         ext = p.suffix.lower().replace(".", "")
         mime = "png" if ext in ("png",) else "jpeg"
         imgs.append(
-            f'<img src="data:image/{mime};base64,{b64}" style="height:{height_px}px; width:auto; object-fit:contain;" />'
+            f'<img src="data:image/{mime};base64,{b64}" '
+            f'style="height:{height_px}px; width:auto; object-fit:contain; display:block;" />'
         )
     return f"""
-    <div style="display:flex; align-items:center; gap:{gap_px}px; flex-wrap:wrap;">
+    <div class="logo-strip">
       {''.join(imgs)}
     </div>
     """
@@ -104,11 +105,9 @@ COEF = {
 OPTIONS = {
     "Gender": ["Man", "Woman"],  # dummy(1)=1 if Woman
     "Nationality": ["Malaysian citizen", "Non-Malaysian citizen"],  # dummy(1)=1 if Non-Malaysian
-
     "Ethnicity": ["Malay", "Chinese", "Indian", "Sabah", "Sarawak"],  # 0..4 -> dummies (1..4)
     "Religion": ["Islam", "Buddhism", "Hinduism", "Others"],          # 0..3 -> dummies (1..3)
     "Marital Status": ["Single", "Married", "Widowed", "Divorced", "Separated"],  # 0..4 -> dummies (1..4)
-
     "Education Level": [
         "No certificate",
         "UPSR",
@@ -120,7 +119,6 @@ OPTIONS = {
         "Diploma",
         "Bachelor's Degree",
     ],  # 0..8 -> dummies (1..8)
-
     "Occupation": [
         "Unemployed",
         "Government employee",
@@ -130,7 +128,6 @@ OPTIONS = {
         "Student",
         "Government retiree",
     ],  # 0..6 -> dummies (1..6)
-
     "Household Size": ["1 person", "2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummies (1..4)
     "Number of Dependents": ["None", "1–2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummies (1..4)
 
@@ -147,7 +144,6 @@ OPTIONS = {
     "Type of Rental Housing (codes)": [2, 3, 4, 5, 6, 7],  # original index in your dataset
 
     "Furnished Type": ["None", "Furnished"],  # dummy(1)=1 if Furnished
-
     "Deposit": [
         "No deposit",
         "1 + 1",
@@ -157,9 +153,7 @@ OPTIONS = {
         "2 + 1 + utility",
         "3 + 1 + utility",
     ],  # 0..6 -> dummies (1..6)
-
     "Total years renting": ["Less than 6 months", "Less than 1 year", "1–2 years", "3–5 years", "6–10 years"],  # 0..4 -> dummies (1..4)
-
     "Known SMART SEWA": ["Yes", "No"],  # dummy(1)=1 if No
 }
 
@@ -261,7 +255,8 @@ logo_paths = [
     APP_DIR / "logo_ukm.png",
 ]
 
-top_l, top_r = st.columns([0.68, 0.32], vertical_alignment="center")
+# nicer header layout: title+caption left, logos right, toggle at far right
+top_l, top_m, top_r = st.columns([0.58, 0.30, 0.12], vertical_alignment="center")
 
 with top_l:
     st.markdown("## Rental Affordability Checker")
@@ -270,11 +265,11 @@ with top_l:
         "Overall = Afford only if both are satisfied."
     )
 
-with top_r:
-    # Logos + dark mode on same header row
-    st.markdown(logo_strip_html(logo_paths, height_px=42, gap_px=12), unsafe_allow_html=True)
-    dark_mode = st.toggle("Dark mode", value=True)
+with top_m:
+    st.markdown(logo_strip_html(logo_paths, height_px=54, gap_px=12), unsafe_allow_html=True)
 
+with top_r:
+    dark_mode = st.toggle("Dark mode", value=True)
 
 # ======================== THEME ========================
 if dark_mode:
@@ -320,6 +315,20 @@ st.markdown(
     color: {TXT} !important;
   }}
   .muted {{ color: {MUTED} !important; }}
+
+  /* Header logo strip nicer */
+  .logo-strip {{
+    display:flex;
+    justify-content:flex-end;
+    align-items:center;
+    gap: 12px;
+    flex-wrap: nowrap;
+    padding: 6px 10px;
+    border-radius: 14px;
+    border: 1px solid {BORDER};
+    background: rgba(255,255,255,0.70);
+    box-shadow: 0 10px 22px rgba(76, 29, 149, 0.08);
+  }}
 
   /* Chips */
   .chip {{
