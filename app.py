@@ -3,8 +3,24 @@ import math
 import pandas as pd
 import streamlit as st
 
+# ==========================================================
+# Rental Affordability Checker (English UI)
+# ----------------------------------------------------------
+# Condition A (Logistic model):
+#   z = SUM(COEF × INPUT)   <-- EXACT sum of the COEF×INPUT column
+#   p = 1 / (1 + exp(-z))
+#   Afford if p >= 0.5
+#
+# Condition B (Rent-to-Income rule):
+#   Afford if Rent <= ratio * Income   (default ratio = 0.38)
+#
+# Overall:
+#   Afford only if BOTH conditions are Afford
+# ==========================================================
+
 st.set_page_config(page_title="Rental Affordability Checker", layout="wide")
 
+# -------------------- COEFFICIENTS --------------------
 COEF = {
     "Umur": -0.006,
     "Jantina ketua keluarga(1)": 0.04,
@@ -62,12 +78,13 @@ COEF = {
     "Constant": 38.956,
 }
 
+# -------------------- ENGLISH OPTIONS --------------------
 OPTIONS = {
-    "Gender": ["Man", "Woman"],
-    "Nationality": ["Malaysian citizen", "Non-Malaysian citizen"],
-    "Ethnicity": ["Malay", "Chinese", "Indian", "Sabah", "Sarawak"],
-    "Religion": ["Islam", "Buddhism", "Hinduism", "Others"],
-    "Marital Status": ["Single", "Married", "Widowed", "Divorced", "Separated"],
+    "Gender": ["Man", "Woman"],  # dummy(1)=1 if Woman
+    "Nationality": ["Malaysian citizen", "Non-Malaysian citizen"],  # dummy(1)=1 if Non-Malaysian
+    "Ethnicity": ["Malay", "Chinese", "Indian", "Sabah", "Sarawak"],  # 0..4 -> dummies (1..4)
+    "Religion": ["Islam", "Buddhism", "Hinduism", "Others"],          # 0..3 -> dummies (1..3)
+    "Marital Status": ["Single", "Married", "Widowed", "Divorced", "Separated"],  # 0..4 -> dummies (1..4)
     "Education Level": [
         "No certificate",
         "UPSR",
@@ -78,7 +95,7 @@ OPTIONS = {
         "Certificate (Polytechnic/University)",
         "Diploma",
         "Bachelor's Degree",
-    ],
+    ],  # 0..8 -> dummies (1..8)
     "Occupation": [
         "Unemployed",
         "Government employee",
@@ -87,30 +104,21 @@ OPTIONS = {
         "Homemaker",
         "Student",
         "Government retiree",
-    ],
-    "Household Size": ["1 person", "2 people", "3–4 people", "5–6 people", "7 people or more"],
-    "Number of Dependents": ["None", "1–2 people", "3–4 people", "5–6 people", "7 people or more"],
+    ],  # 0..6 -> dummies (1..6)
+    "Household Size": ["1 person", "2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummies (1..4)
+    "Number of Dependents": ["None", "1–2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummies (1..4)
 
-    "Type of Rental Housing FULL": [
-        "House",
-        "Room",
+    # ✅ removed "House" and "Room"
+    "Type of Rental Housing": [
         "Flat",
         "Apartment",
         "Condominium",
         "Terrace House (Single storey)",
         "Terrace House (Double storey)",
         "One-unit house",
-    ],
-    "Type of Rental Housing UI": [
-        "Flat",
-        "Apartment",
-        "Condominium",
-        "Terrace House (Single storey)",
-        "Terrace House (Double storey)",
-        "One-unit house",
-    ],
+    ],  # 0..5 -> model has dummies (1..5) only; base is idx=0
 
-    "Furnished Type": ["None", "Furnished"],
+    "Furnished Type": ["None", "Furnished"],  # dummy(1)=1 if Furnished
     "Deposit": [
         "No deposit",
         "1 + 1",
@@ -119,11 +127,12 @@ OPTIONS = {
         "1 + 1 + utility",
         "2 + 1 + utility",
         "3 + 1 + utility",
-    ],
-    "Total years renting": ["Less than 6 months", "Less than 1 year", "1–2 years", "3–5 years", "6–10 years"],
-    "Known SMART SEWA": ["Yes", "No"],
+    ],  # 0..6 -> dummies (1..6)
+    "Total years renting": ["Less than 6 months", "Less than 1 year", "1–2 years", "3–5 years", "6–10 years"],  # 0..4 -> dummies (1..4)
+    "Known SMART SEWA": ["Yes", "No"],  # dummy(1)=1 if No
 }
 
+# -------------------- logistic (stable) --------------------
 def logistic(z: float) -> float:
     if z >= 0:
         ez = math.exp(-z)
@@ -131,6 +140,7 @@ def logistic(z: float) -> float:
     ez = math.exp(z)
     return ez / (1.0 + ez)
 
+# -------------------- Build INPUTs --------------------
 def build_inputs(
     age: int,
     gender_idx: int,
@@ -176,6 +186,9 @@ def build_inputs(
     for k in range(1, 5):
         inp[f"Bilangan tanggungan({k})"] = 1.0 if dep_idx == k else 0.0
 
+    # Rental housing: model only has Jenis rumah sewa(1..5)
+    # Our dropdown base is idx=0 (Flat) => all zeros (base)
+    # idx=1..5 map to Jenis rumah sewa(1..5)
     for k in range(1, 6):
         inp[f"Jenis rumah sewa({k})"] = 1.0 if rental_idx == k else 0.0
 
@@ -187,55 +200,65 @@ def build_inputs(
     for k in range(1, 5):
         inp[f"Berapa lama anda telah menyewa rumah({k})"] = 1.0 if years_idx == k else 0.0
 
+    # (1) means "No"
     inp["Adakah anda mengetahui terdapat skim mampu sewa di Malaysia? (contoh: SMART sewa)(1)"] = 1.0 if smart_idx == 1 else 0.0
     return inp
 
+# -------------------- Compute table + z + p --------------------
 def compute_table(inputs: dict):
     rows = []
     for var, coef in COEF.items():
         x = float(inputs.get(var, 0.0))
         rows.append({"Variable": var, "COEF": float(coef), "INPUT": x, "COEF×INPUT": float(coef) * x})
     df = pd.DataFrame(rows)
-    z = float(df["COEF×INPUT"].sum())
+    z = float(df["COEF×INPUT"].sum())  # ✅ EXACT SUM OF COLUMN
     p = float(logistic(z))
     return df, z, p
 
-# ===== top toggle only =====
-_, top_r = st.columns([0.78, 0.22], vertical_alignment="center")
+# ======================== TOP BAR ========================
+top_l, top_r = st.columns([0.78, 0.22], vertical_alignment="center")
+with top_l:
+    st.markdown("## Rental Affordability Checker")
+    st.caption("Two checks are applied: Condition A (Logistic model) and Condition B (Rent ≤ ratio×Income). Overall = Afford only if both are satisfied.")
 with top_r:
-    dark_mode = st.toggle("Dark mode", value=False)
+    dark_mode = st.toggle("Dark mode", value=True)
 
-# ===== theme vars =====
+# ======================== THEME ========================
 if dark_mode:
     PAGE_BG = "linear-gradient(180deg, #0b0b14 0%, #0b0b14 45%, #1a102b 100%)"
     CARD_BG = "rgba(17, 24, 39, 0.68)"
     BORDER = "rgba(167, 139, 250, 0.22)"
     TXT = "#f8fafc"
+    DF_TXT = "#e5e7eb"
     MUTED = "rgba(248,250,252,.75)"
-    WIDGET_BG = "rgba(17, 24, 39, 0.92)"
-    WIDGET_TXT = "#f8fafc"
-    WIDGET_PLACEHOLDER = "rgba(248,250,252,.65)"
 else:
     PAGE_BG = "linear-gradient(180deg, #f7f2ff 0%, #f7f2ff 45%, #efe6ff 100%)"
     CARD_BG = "rgba(255,255,255,0.84)"
     BORDER = "rgba(139, 92, 246, 0.20)"
     TXT = "#111827"
+    DF_TXT = "#111827"
     MUTED = "rgba(17,24,39,.70)"
-    WIDGET_BG = "rgba(17, 24, 39, 0.10)"
-    WIDGET_TXT = "#111827"
-    WIDGET_PLACEHOLDER = "rgba(17,24,39,.55)"
+
+# Widgets stay DARK in both modes -> force widget text WHITE always
+WIDGET_BG = "rgba(17, 24, 39, 0.92)"
+WIDGET_BORDER = "rgba(167, 139, 250, 0.22)"
+WIDGET_TEXT = "#f8fafc"
 
 st.markdown(
     f"""
 <style>
-  header[data-testid="stHeader"] {{ display:none !important; }}
-  div[data-testid="stToolbar"] {{ display:none !important; }}
-  .block-container {{ padding-top: .35rem !important; }}
+  /* ✅ remove the top Streamlit header/decoration bar that overlaps */
+  header[data-testid="stHeader"] {{ display: none !important; }}
+  div[data-testid="stDecoration"] {{ display: none !important; }}
+  div[data-testid="stToolbar"] {{ display: none !important; }}
+  #MainMenu {{ visibility: hidden; }}
+  footer {{ visibility: hidden; }}
 
   .stApp {{
     background: {PAGE_BG} !important;
     color: {TXT} !important;
   }}
+  .block-container {{ padding-top: .25rem; }}
 
   .purple-card {{
     background: {CARD_BG};
@@ -250,39 +273,6 @@ st.markdown(
   }}
   .muted {{ color: {MUTED} !important; }}
 
-  /* ===== FORCE WIDGET TEXT COLORS (fix your issue) ===== */
-  /* labels */
-  div[data-testid="stWidgetLabel"] * {{
-    color: {TXT} !important;
-  }}
-
-  /* selectbox/input text */
-  div[data-baseweb="select"] * {{
-    color: {WIDGET_TXT} !important;
-  }}
-  input, textarea {{
-    color: {WIDGET_TXT} !important;
-    -webkit-text-fill-color: {WIDGET_TXT} !important;
-  }}
-
-  /* widget background */
-  div[data-baseweb="select"] > div {{
-    background: {WIDGET_BG} !important;
-    border-radius: 10px !important;
-  }}
-  div[data-testid="stNumberInput"] input {{
-    background: {WIDGET_BG} !important;
-  }}
-
-  /* placeholder */
-  div[data-baseweb="select"] span {{
-    color: {WIDGET_TXT} !important;
-  }}
-  ::placeholder {{
-    color: {WIDGET_PLACEHOLDER} !important;
-  }}
-
-  /* chips */
   .chip {{
     display:inline-block;
     padding: 6px 12px;
@@ -304,9 +294,44 @@ st.markdown(
     background: rgba(254,226,226,.92);
   }}
 
-  /* dataframe text */
+  /* DataFrame text color */
   div[data-testid="stDataFrame"] * {{
-    color: {TXT} !important;
+    color: {DF_TXT} !important;
+  }}
+
+  /* ✅ FORCE widget (inputs/selects) text WHITE in BOTH modes */
+  .stNumberInput div[data-baseweb="input"] {{
+    background: {WIDGET_BG} !important;
+    border: 1px solid {WIDGET_BORDER} !important;
+    border-radius: 12px !important;
+  }}
+  .stNumberInput div[data-baseweb="input"] input {{
+    color: {WIDGET_TEXT} !important;
+    -webkit-text-fill-color: {WIDGET_TEXT} !important;
+    caret-color: {WIDGET_TEXT} !important;
+  }}
+
+  .stSelectbox div[data-baseweb="select"] > div {{
+    background: {WIDGET_BG} !important;
+    border: 1px solid {WIDGET_BORDER} !important;
+    border-radius: 12px !important;
+  }}
+  .stSelectbox div[data-baseweb="select"] * {{
+    color: {WIDGET_TEXT} !important;
+  }}
+
+  /* dropdown menu */
+  ul[role="listbox"] {{
+    background: {WIDGET_BG} !important;
+    border: 1px solid {WIDGET_BORDER} !important;
+  }}
+  ul[role="listbox"] li {{
+    color: {WIDGET_TEXT} !important;
+  }}
+
+  /* +/- buttons on number input */
+  .stNumberInput button {{
+    color: {WIDGET_TEXT} !important;
   }}
 </style>
 """,
@@ -337,10 +362,7 @@ with left:
         job = st.selectbox("Occupation", OPTIONS["Occupation"], index=0)
         household = st.selectbox("Household Size", OPTIONS["Household Size"], index=0)
         dependents = st.selectbox("Number of Dependents", OPTIONS["Number of Dependents"], index=0)
-
-        rental_ui = st.selectbox("Type of Rental Housing", OPTIONS["Type of Rental Housing UI"], index=0)
-        rental_full_idx = OPTIONS["Type of Rental Housing FULL"].index(rental_ui)
-
+        rental = st.selectbox("Type of Rental Housing", OPTIONS["Type of Rental Housing"], index=0)
         furnished = st.selectbox("Furnished Type", OPTIONS["Furnished Type"], index=0)
         deposit = st.selectbox("Deposit", OPTIONS["Deposit"], index=0)
         years = st.selectbox("Total years renting", OPTIONS["Total years renting"], index=0)
@@ -359,6 +381,7 @@ with left:
     run = st.button("✅ Run Check", use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
+# ======================== RESULTS (ONLY AFTER RUN) ========================
 if "result" not in st.session_state:
     st.session_state["result"] = None
 
@@ -374,7 +397,7 @@ if run:
         job_idx=OPTIONS["Occupation"].index(job),
         household_idx=OPTIONS["Household Size"].index(household),
         dep_idx=OPTIONS["Number of Dependents"].index(dependents),
-        rental_idx=rental_full_idx,
+        rental_idx=OPTIONS["Type of Rental Housing"].index(rental),  # 0..5
         furnish_idx=OPTIONS["Furnished Type"].index(furnished),
         deposit_idx=OPTIONS["Deposit"].index(deposit),
         years_idx=OPTIONS["Total years renting"].index(years),
