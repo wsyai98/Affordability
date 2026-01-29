@@ -256,7 +256,7 @@ def compute_table(inputs: dict):
 # ======================== TOP BAR ========================
 logo_paths = [
     APP_DIR / "logo_kpkt.png",
-    APP_DIR / "logo_kementerian_ekonomi.png",
+    APP_DIR / "logo_kementerian_ekonomi.jpg",
     APP_DIR / "logo_uitm.png",
     APP_DIR / "logo_ukm.png",
 ]
