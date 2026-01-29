@@ -91,7 +91,7 @@ OPTIONS = {
     "Household Size": ["1 person", "2 people", "3–4 people", "5–6 people", "7 people or more"],
     "Number of Dependents": ["None", "1–2 people", "3–4 people", "5–6 people", "7 people or more"],
 
-    # removed House + Room
+    # removed House + Room (as you asked)
     "Type of Rental Housing": [
         "Flat",
         "Apartment",
@@ -99,7 +99,7 @@ OPTIONS = {
         "Terrace House (Single storey)",
         "Terrace House (Double storey)",
         "One-unit house",
-    ],  # idx 0..5, model uses dummies 1..5
+    ],
 
     "Furnished Type": ["None", "Furnished"],
     "Deposit": ["No deposit", "1 + 1", "2 + 1", "3 + 1", "1 + 1 + utility", "2 + 1 + utility", "3 + 1 + utility"],
@@ -180,7 +180,7 @@ def compute_table(inputs: dict):
         x = float(inputs.get(var, 0.0))
         rows.append({"Variable": var, "COEF": float(coef), "INPUT": x, "COEF×INPUT": float(coef) * x})
     df = pd.DataFrame(rows)
-    z = float(df["COEF×INPUT"].sum())
+    z = float(df["COEF×INPUT"].sum())  # exact sum of the column
     p = float(logistic(z))
     return df, z, p
 
@@ -208,13 +208,21 @@ else:
     DF_TXT = "#111827"
     MUTED = "rgba(17,24,39,.70)"
 
+# widgets always dark-style (as you prefer)
 WIDGET_BG = "rgba(17, 24, 39, 0.92)"
 WIDGET_BORDER = "rgba(167, 139, 250, 0.22)"
 WIDGET_TEXT = "#f8fafc"
 
+# buttons (always dark background + white font, for BOTH modes)
+BTN_BG = "linear-gradient(90deg, rgba(17,24,39,.96), rgba(17,24,39,.88))"
+BTN_BG_HOVER = "linear-gradient(90deg, rgba(31,41,55,.98), rgba(17,24,39,.92))"
+BTN_BORDER = "rgba(167, 139, 250, 0.28)"
+BTN_TEXT = "#f8fafc"
+
 st.markdown(
     f"""
 <style>
+  /* remove Streamlit top header bar that overlaps */
   header[data-testid="stHeader"] {{ display: none !important; }}
   div[data-testid="stDecoration"] {{ display: none !important; }}
   div[data-testid="stToolbar"] {{ display: none !important; }}
@@ -265,7 +273,7 @@ st.markdown(
     color: {DF_TXT} !important;
   }}
 
-  /* widgets */
+  /* widgets: always dark input look */
   .stNumberInput div[data-baseweb="input"] {{
     background: {WIDGET_BG} !important;
     border: 1px solid {WIDGET_BORDER} !important;
@@ -294,9 +302,30 @@ st.markdown(
     color: {WIDGET_TEXT} !important;
   }}
 
-  /* ✅ FIX: only color +/- buttons inside number input, NOT every button */
+  /* ONLY +/- buttons inside number input */
   .stNumberInput div[data-baseweb="input"] button {{
     color: {WIDGET_TEXT} !important;
+  }}
+
+  /* ✅ FIX: Run Check + Download buttons always white text */
+  div.stButton > button,
+  div.stDownloadButton > button {{
+    background: {BTN_BG} !important;
+    color: {BTN_TEXT} !important;
+    border: 1px solid {BTN_BORDER} !important;
+    border-radius: 14px !important;
+    font-weight: 800 !important;
+    padding: 0.75rem 1rem !important;
+  }}
+  div.stButton > button:hover,
+  div.stDownloadButton > button:hover {{
+    background: {BTN_BG_HOVER} !important;
+    color: {BTN_TEXT} !important;
+    border-color: rgba(167, 139, 250, 0.40) !important;
+  }}
+  div.stButton > button:active,
+  div.stDownloadButton > button:active {{
+    transform: translateY(1px);
   }}
 </style>
 """,
