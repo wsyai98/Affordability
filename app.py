@@ -7,39 +7,31 @@ import base64
 
 # ==========================================================
 # Rental Affordability Checker (English UI)
-# ----------------------------------------------------------
-# Condition A (Logistic model):
-#   z = SUM(COEF * INPUT)   <-- EXACT sum of COEF×INPUT column
-#   p = 1 / (1 + exp(-z))
-#   Afford if p >= 0.5
-#
-# Condition B (Rent-to-Income rule):
-#   Afford if Rent <= ratio * Income   (default ratio = 0.38)
-#
-# Overall:
-#   Afford only if BOTH conditions are Afford
 # ==========================================================
 APP_DIR = Path(__file__).resolve().parent
+
 
 def img_to_base64(path: Path) -> str:
     data = path.read_bytes()
     return base64.b64encode(data).decode("utf-8")
 
-def logo_strip_html(paths, height_px=52, gap_px=12):
+
+def logo_strip_html(paths, height_px=44, gap_px=10):
     imgs = []
     for p in paths:
         b64 = img_to_base64(p)
         ext = p.suffix.lower().replace(".", "")
         mime = "png" if ext in ("png",) else "jpeg"
         imgs.append(
-            f'<img src="data:image/{mime};base64,{b64}" '
-            f'style="height:{height_px}px; width:auto; object-fit:contain; display:block;" />'
+            f'<img class="logo-img" src="data:image/{mime};base64,{b64}" '
+            f'style="height:{height_px}px; width:auto; object-fit:contain;" />'
         )
     return f"""
-    <div class="logo-strip">
+    <div class="logo-strip" style="gap:{gap_px}px;">
       {''.join(imgs)}
     </div>
     """
+
 
 st.set_page_config(page_title="Rental Affordability Checker", layout="wide")
 
@@ -106,7 +98,7 @@ OPTIONS = {
     "Gender": ["Man", "Woman"],  # dummy(1)=1 if Woman
     "Nationality": ["Malaysian citizen", "Non-Malaysian citizen"],  # dummy(1)=1 if Non-Malaysian
     "Ethnicity": ["Malay", "Chinese", "Indian", "Sabah", "Sarawak"],  # 0..4 -> dummies (1..4)
-    "Religion": ["Islam", "Buddhism", "Hinduism", "Others"],          # 0..3 -> dummies (1..3)
+    "Religion": ["Islam", "Buddhism", "Hinduism", "Others"],  # 0..3 -> dummies (1..3)
     "Marital Status": ["Single", "Married", "Widowed", "Divorced", "Separated"],  # 0..4 -> dummies (1..4)
     "Education Level": [
         "No certificate",
@@ -130,9 +122,7 @@ OPTIONS = {
     ],  # 0..6 -> dummies (1..6)
     "Household Size": ["1 person", "2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummies (1..4)
     "Number of Dependents": ["None", "1–2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummies (1..4)
-
-    # NOTE: House + Room REMOVED from UI.
-    # We still keep the ORIGINAL codes (2..7) so the model mapping stays correct.
+    # NOTE: House + Room REMOVED from UI (keep original codes)
     "Type of Rental Housing (labels)": [
         "Flat",
         "Apartment",
@@ -141,8 +131,7 @@ OPTIONS = {
         "Terrace House (Double storey)",
         "One-unit house",
     ],
-    "Type of Rental Housing (codes)": [2, 3, 4, 5, 6, 7],  # original index in your dataset
-
+    "Type of Rental Housing (codes)": [2, 3, 4, 5, 6, 7],
     "Furnished Type": ["None", "Furnished"],  # dummy(1)=1 if Furnished
     "Deposit": [
         "No deposit",
@@ -157,7 +146,7 @@ OPTIONS = {
     "Known SMART SEWA": ["Yes", "No"],  # dummy(1)=1 if No
 }
 
-# -------------------- logistic (stable) --------------------
+
 def logistic(z: float) -> float:
     if z >= 0:
         ez = math.exp(-z)
@@ -165,7 +154,7 @@ def logistic(z: float) -> float:
     ez = math.exp(z)
     return ez / (1.0 + ez)
 
-# -------------------- Build INPUTs (age + dummies + constant=1) --------------------
+
 def build_inputs(
     age: int,
     gender_idx: int,
@@ -177,7 +166,7 @@ def build_inputs(
     job_idx: int,
     household_idx: int,
     dep_idx: int,
-    rental_code: int,     # <-- IMPORTANT: original code (2..7) after removing House/Room
+    rental_code: int,  # original code (2..7) after removing House/Room
     furnish_idx: int,
     deposit_idx: int,
     years_idx: int,
@@ -192,27 +181,20 @@ def build_inputs(
 
     for k in range(1, 5):
         inp[f"Bangsa({k})"] = 1.0 if ethnicity_idx == k else 0.0
-
     for k in range(1, 4):
         inp[f"Agama({k})"] = 1.0 if religion_idx == k else 0.0
-
     for k in range(1, 5):
         inp[f"Status Perkahwinan({k})"] = 1.0 if marital_idx == k else 0.0
-
     for k in range(1, 9):
         inp[f"Tahap Pendidikan({k})"] = 1.0 if edu_idx == k else 0.0
-
     for k in range(1, 7):
         inp[f"Pekerjaan({k})"] = 1.0 if job_idx == k else 0.0
-
     for k in range(1, 5):
         inp[f"Bilangan isi rumah({k})"] = 1.0 if household_idx == k else 0.0
-
     for k in range(1, 5):
         inp[f"Bilangan tanggungan({k})"] = 1.0 if dep_idx == k else 0.0
 
-    # Model has Jenis rumah sewa(1..5).
-    # If rental_code is 6 or 7 -> treated as base (all zeros).
+    # Model has Jenis rumah sewa(1..5). If rental_code is 6 or 7 -> base (zeros).
     for k in range(1, 6):
         inp[f"Jenis rumah sewa({k})"] = 1.0 if rental_code == k else 0.0
 
@@ -220,32 +202,24 @@ def build_inputs(
 
     for k in range(1, 7):
         inp[f"Bayaran deposit({k})"] = 1.0 if deposit_idx == k else 0.0
-
     for k in range(1, 5):
         inp[f"Berapa lama anda telah menyewa rumah({k})"] = 1.0 if years_idx == k else 0.0
 
     # (1) means "No"
     inp["Adakah anda mengetahui terdapat skim mampu sewa di Malaysia? (contoh: SMART sewa)(1)"] = 1.0 if smart_idx == 1 else 0.0
-
     return inp
 
-# -------------------- Compute table + z + p --------------------
+
 def compute_table(inputs: dict):
     rows = []
     for var, coef in COEF.items():
         x = float(inputs.get(var, 0.0))
-        rows.append(
-            {
-                "Variable": var,
-                "COEF": float(coef),
-                "INPUT": x,
-                "COEF×INPUT": float(coef) * x,
-            }
-        )
+        rows.append({"Variable": var, "COEF": float(coef), "INPUT": x, "COEF×INPUT": float(coef) * x})
     df = pd.DataFrame(rows)
     z = float(df["COEF×INPUT"].sum())  # EXACT SUM OF COLUMN
     p = float(logistic(z))
     return df, z, p
+
 
 # ======================== TOP BAR ========================
 logo_paths = [
@@ -255,8 +229,7 @@ logo_paths = [
     APP_DIR / "logo_ukm.png",
 ]
 
-# nicer header layout: title+caption left, logos right, toggle at far right
-top_l, top_m, top_r = st.columns([0.58, 0.30, 0.12], vertical_alignment="center")
+top_l, top_r = st.columns([0.68, 0.32], vertical_alignment="center")
 
 with top_l:
     st.markdown("## Rental Affordability Checker")
@@ -265,10 +238,8 @@ with top_l:
         "Overall = Afford only if both are satisfied."
     )
 
-with top_m:
-    st.markdown(logo_strip_html(logo_paths, height_px=54, gap_px=12), unsafe_allow_html=True)
-
 with top_r:
+    st.markdown(logo_strip_html(logo_paths, height_px=44, gap_px=10), unsafe_allow_html=True)
     dark_mode = st.toggle("Dark mode", value=True)
 
 # ======================== THEME ========================
@@ -287,6 +258,7 @@ else:
 
 # Always keep widget inputs WHITE because fields are dark in both modes
 WIDGET_TEXT = "#f8fafc"
+DROPDOWN_BG = "rgba(17, 24, 39, 0.98)"  # menu bg (always dark)
 
 st.markdown(
     f"""
@@ -316,21 +288,24 @@ st.markdown(
   }}
   .muted {{ color: {MUTED} !important; }}
 
-  /* Header logo strip nicer */
+  /* ===== Header logos (tight, ngam-ngam) ===== */
   .logo-strip {{
     display:flex;
     justify-content:flex-end;
     align-items:center;
-    gap: 12px;
     flex-wrap: nowrap;
-    padding: 6px 10px;
-    border-radius: 14px;
+    padding: 2px 6px;                      /* tight */
+    border-radius: 12px;
     border: 1px solid {BORDER};
-    background: rgba(255,255,255,0.70);
-    box-shadow: 0 10px 22px rgba(76, 29, 149, 0.08);
+    background: rgba(255,255,255,0.55);
+    box-shadow: none;
+    line-height: 0;                         /* remove extra height */
+  }}
+  .logo-strip .logo-img {{
+    display:block;
   }}
 
-  /* Chips */
+  /* ===== Chips ===== */
   .chip {{
     display:inline-block;
     padding: 6px 12px;
@@ -352,18 +327,39 @@ st.markdown(
     background: rgba(254,226,226,.92);
   }}
 
-  /* Keep ALL widget input text white (number inputs, selects, etc.) */
+  /* ===== Keep ALL widget input text white (number inputs, selects, etc.) ===== */
   .stNumberInput input, .stTextInput input, .stTextArea textarea {{
     color: {WIDGET_TEXT} !important;
     -webkit-text-fill-color: {WIDGET_TEXT} !important;
     caret-color: {WIDGET_TEXT} !important;
   }}
+
+  /* Select (closed state) */
   [data-baseweb="select"] * {{
     color: {WIDGET_TEXT} !important;
+    -webkit-text-fill-color: {WIDGET_TEXT} !important;
   }}
   [data-baseweb="select"] input {{
     color: {WIDGET_TEXT} !important;
     -webkit-text-fill-color: {WIDGET_TEXT} !important;
+  }}
+
+  /* Select dropdown menu (open state) — FORCE WHITE TEXT even in light mode */
+  [data-baseweb="popover"] * {{
+    color: {WIDGET_TEXT} !important;
+    -webkit-text-fill-color: {WIDGET_TEXT} !important;
+  }}
+  [data-baseweb="menu"] {{
+    background: {DROPDOWN_BG} !important;
+  }}
+  ul[role="listbox"] {{
+    background: {DROPDOWN_BG} !important;
+  }}
+  li[role="option"] {{
+    background: transparent !important;
+  }}
+  li[role="option"]:hover {{
+    background: rgba(167, 139, 250, 0.14) !important;
   }}
 
   /* DataFrame text color (table) */
@@ -402,8 +398,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
 def chip(label: str, ok: bool) -> str:
     return f'<span class="chip {"ok" if ok else "no"}">{label}</span>'
+
 
 # ======================== LAYOUT ========================
 left, right = st.columns([1, 1.35], gap="large")
