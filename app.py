@@ -91,7 +91,7 @@ COEF = {
     "Constant": 38.956,
 }
 
-# -------------------- ENGLISH OPTIONS (coded by index like your sheet) --------------------
+# -------------------- OPTIONS (English) --------------------
 OPTIONS = {
     "Gender": ["Man", "Woman"],  # dummy(1)=1 if Woman
     "Nationality": ["Malaysian citizen", "Non-Malaysian citizen"],  # dummy(1)=1 if Non-Malaysian
@@ -125,16 +125,27 @@ OPTIONS = {
     "Household Size": ["1 person", "2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummies (1..4)
     "Number of Dependents": ["None", "1–2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummies (1..4)
 
-    "Type of Rental Housing": [
-        "House",
-        "Room",
+    # FULL original list (for indexing reference)
+    "Type of Rental Housing FULL": [
+        "House",  # idx 0
+        "Room",   # idx 1
+        "Flat",   # idx 2
+        "Apartment",  # idx 3
+        "Condominium",  # idx 4
+        "Terrace House (Single storey)",  # idx 5
+        "Terrace House (Double storey)",  # idx 6
+        "One-unit house",  # idx 7
+    ],
+
+    # UI list (REMOVE House + Room)
+    "Type of Rental Housing UI": [
         "Flat",
         "Apartment",
         "Condominium",
         "Terrace House (Single storey)",
         "Terrace House (Double storey)",
         "One-unit house",
-    ],  # 0..7 -> model has dummies (1..5) only; others treated as base
+    ],
 
     "Furnished Type": ["None", "Furnished"],  # dummy(1)=1 if Furnished
 
@@ -161,7 +172,7 @@ def logistic(z: float) -> float:
     ez = math.exp(z)
     return ez / (1.0 + ez)
 
-# -------------------- Build INPUTs (age + dummies + constant=1) --------------------
+# -------------------- Build INPUTs --------------------
 def build_inputs(
     age: int,
     gender_idx: int,
@@ -173,7 +184,7 @@ def build_inputs(
     job_idx: int,
     household_idx: int,
     dep_idx: int,
-    rental_idx: int,
+    rental_idx: int,   # IMPORTANT: original FULL index (0..7)
     furnish_idx: int,
     deposit_idx: int,
     years_idx: int,
@@ -208,6 +219,7 @@ def build_inputs(
         inp[f"Bilangan tanggungan({k})"] = 1.0 if dep_idx == k else 0.0
 
     # Model has Jenis rumah sewa(1..5). If user picks idx 6/7 => treated as base (all zeros)
+    # Here, rental_idx is the ORIGINAL index from the FULL list.
     for k in range(1, 6):
         inp[f"Jenis rumah sewa({k})"] = 1.0 if rental_idx == k else 0.0
 
@@ -238,12 +250,11 @@ def compute_table(inputs: dict):
             }
         )
     df = pd.DataFrame(rows)
-    z = float(df["COEF×INPUT"].sum())  # IMPORTANT: EXACT SUM OF COLUMN
+    z = float(df["COEF×INPUT"].sum())  # EXACT SUM OF COLUMN
     p = float(logistic(z))
     return df, z, p
 
-# ======================== TOP BAR (HEADER REMOVED TO AVOID OVERLAP) ========================
-# keep ONLY the toggle at top-right (no title/caption)
+# ======================== TOP TOGGLE ONLY ========================
 _, top_r = st.columns([0.78, 0.22], vertical_alignment="center")
 with top_r:
     dark_mode = st.toggle("Dark mode", value=True)
@@ -253,25 +264,36 @@ if dark_mode:
     PAGE_BG = "linear-gradient(180deg, #0b0b14 0%, #0b0b14 45%, #1a102b 100%)"
     CARD_BG = "rgba(17, 24, 39, 0.68)"
     BORDER = "rgba(167, 139, 250, 0.22)"
-    TXT = "#f8fafc"     # white
-    DF_TXT = "#e5e7eb"  # dataframe text
+    TXT = "#f8fafc"
+    DF_TXT = "#e5e7eb"
     MUTED = "rgba(248,250,252,.75)"
 else:
     PAGE_BG = "linear-gradient(180deg, #f7f2ff 0%, #f7f2ff 45%, #efe6ff 100%)"
     CARD_BG = "rgba(255,255,255,0.84)"
     BORDER = "rgba(139, 92, 246, 0.20)"
-    TXT = "#111827"     # black
+    TXT = "#111827"
     DF_TXT = "#111827"
     MUTED = "rgba(17,24,39,.70)"
 
 st.markdown(
     f"""
 <style>
+  /* --- HIDE STREAMLIT TOP HEADER BAR (the one blocking you) --- */
+  header[data-testid="stHeader"] {{
+    display: none !important;
+  }}
+  div[data-testid="stToolbar"] {{
+    display: none !important;
+  }}
+  /* Also remove extra top padding that header usually creates */
+  .block-container {{
+    padding-top: .35rem !important;
+  }}
+
   .stApp {{
     background: {PAGE_BG} !important;
     color: {TXT} !important;
   }}
-  .block-container {{ padding-top: .35rem; }}
 
   .purple-card {{
     background: {CARD_BG};
@@ -340,7 +362,11 @@ with left:
         job = st.selectbox("Occupation", OPTIONS["Occupation"], index=0)
         household = st.selectbox("Household Size", OPTIONS["Household Size"], index=0)
         dependents = st.selectbox("Number of Dependents", OPTIONS["Number of Dependents"], index=0)
-        rental = st.selectbox("Type of Rental Housing", OPTIONS["Type of Rental Housing"], index=0)
+
+        # ---- Rental type: UI list without House/Room, but map back to FULL index ----
+        rental_ui = st.selectbox("Type of Rental Housing", OPTIONS["Type of Rental Housing UI"], index=0)
+        rental_full_idx = OPTIONS["Type of Rental Housing FULL"].index(rental_ui)  # returns 2..7
+
         furnished = st.selectbox("Furnished Type", OPTIONS["Furnished Type"], index=0)
         deposit = st.selectbox("Deposit", OPTIONS["Deposit"], index=0)
         years = st.selectbox("Total years renting", OPTIONS["Total years renting"], index=0)
@@ -375,7 +401,7 @@ if run:
         job_idx=OPTIONS["Occupation"].index(job),
         household_idx=OPTIONS["Household Size"].index(household),
         dep_idx=OPTIONS["Number of Dependents"].index(dependents),
-        rental_idx=OPTIONS["Type of Rental Housing"].index(rental),
+        rental_idx=rental_full_idx,  # IMPORTANT: original index
         furnish_idx=OPTIONS["Furnished Type"].index(furnished),
         deposit_idx=OPTIONS["Deposit"].index(deposit),
         years_idx=OPTIONS["Total years renting"].index(years),
