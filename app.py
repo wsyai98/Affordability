@@ -2,6 +2,8 @@
 import math
 import pandas as pd
 import streamlit as st
+from pathlib import Path
+import base64
 
 # ==========================================================
 # Rental Affordability Checker (English UI)
@@ -17,6 +19,26 @@ import streamlit as st
 # Overall:
 #   Afford only if BOTH conditions are Afford
 # ==========================================================
+APP_DIR = Path(__file__).resolve().parent
+
+def img_to_base64(path: Path) -> str:
+    data = path.read_bytes()
+    return base64.b64encode(data).decode("utf-8")
+
+def logo_strip_html(paths, height_px=44, gap_px=14):
+    imgs = []
+    for p in paths:
+        b64 = img_to_base64(p)
+        ext = p.suffix.lower().replace(".", "")
+        mime = "png" if ext in ("png",) else "jpeg"
+        imgs.append(
+            f'<img src="data:image/{mime};base64,{b64}" style="height:{height_px}px; width:auto; object-fit:contain;" />'
+        )
+    return f"""
+    <div style="display:flex; align-items:center; gap:{gap_px}px; flex-wrap:wrap;">
+      {''.join(imgs)}
+    </div>
+    """
 
 st.set_page_config(page_title="Rental Affordability Checker", layout="wide")
 
@@ -232,15 +254,27 @@ def compute_table(inputs: dict):
     return df, z, p
 
 # ======================== TOP BAR ========================
-top_l, top_r = st.columns([0.78, 0.22], vertical_alignment="center")
+logo_paths = [
+    APP_DIR / "logo_kpkt.png",
+    APP_DIR / "logo_kementerian_ekonomi.png",
+    APP_DIR / "logo_uitm.png",
+    APP_DIR / "logo_ukm.png",
+]
+
+top_l, top_r = st.columns([0.68, 0.32], vertical_alignment="center")
+
 with top_l:
     st.markdown("## Rental Affordability Checker")
     st.caption(
         "Two checks are applied: Condition A (Logistic model) and Condition B (Rent ≤ ratio×Income). "
         "Overall = Afford only if both are satisfied."
     )
+
 with top_r:
+    # Logos + dark mode on same header row
+    st.markdown(logo_strip_html(logo_paths, height_px=42, gap_px=12), unsafe_allow_html=True)
     dark_mode = st.toggle("Dark mode", value=True)
+
 
 # ======================== THEME ========================
 if dark_mode:
