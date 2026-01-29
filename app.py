@@ -6,22 +6,23 @@ import pandas as pd
 import streamlit as st
 
 # ==========================================================
-# RENTAL AFFORDABILITY CHECKER
-# Condition A (Logistic):
-#   z = SUM( COEF * INPUT )
-#   p = 1 / (1 + EXP(-z))
+# Rental Affordability Checker (English UI)
+# ----------------------------------------------------------
+# Condition A (Logistic model):
+#   z = SUM(COEF * INPUT)   <-- IMPORTANT: this is the sum of the COEF*INPUT column
+#   p = 1 / (1 + exp(-z))
 #   Afford if p >= 0.5
 #
-# Condition B (Rent-to-Income):
+# Condition B (Rent-to-Income rule):
 #   Afford if Rent <= ratio * Income   (default ratio = 0.38)
 #
 # Overall:
-#   Afford only if (Condition A == Afford) AND (Condition B == Afford)
+#   Afford only if BOTH conditions are Afford
 # ==========================================================
 
 st.set_page_config(page_title="Rental Affordability Checker", layout="wide")
 
-# ---------- Coefficients (exact naming style like your Excel) ----------
+# -------------------- COEFFICIENTS (from your Excel) --------------------
 COEF = {
     "Umur": -0.006,
     "Jantina ketua keluarga(1)": 0.04,
@@ -92,14 +93,14 @@ COEF = {
     "Constant": 38.956,
 }
 
-# ---------- English UI options (index numbers follow your coding table: 0,1,2,...) ----------
+# -------------------- ENGLISH OPTIONS (match your coding index) --------------------
 OPTIONS = {
-    "Gender": ["Man", "Woman"],  # 0,1  -> dummy (1) = 1 if Woman
-    "Nationality": ["Malaysian citizen", "Non-Malaysian citizen"],  # 0,1 -> dummy (1)=1 if Non-Malaysian
+    "Gender": ["Man", "Woman"],  # dummy(1)=1 if Woman
+    "Nationality": ["Malaysian citizen", "Non-Malaysian citizen"],  # dummy(1)=1 if Non-Malaysian
 
-    "Ethnicity": ["Malay", "Chinese", "Indian", "Sabah", "Sarawak"],  # 0..4 -> dummy (k)=1 if selected index==k for k=1..4
-    "Religion": ["Islam", "Buddhism", "Hinduism", "Others"],          # 0..3 -> dummy (k)=1 if index==k for k=1..3
-    "Marital Status": ["Single", "Married", "Widowed", "Divorced", "Separated"],  # 0..4 -> dummy (k)=1 if index==k for k=1..4
+    "Ethnicity": ["Malay", "Chinese", "Indian", "Sabah", "Sarawak"],  # 0..4 -> dummies (1..4)
+    "Religion": ["Islam", "Buddhism", "Hinduism", "Others"],          # 0..3 -> dummies (1..3)
+    "Marital Status": ["Single", "Married", "Widowed", "Divorced", "Separated"],  # 0..4 -> dummies (1..4)
 
     "Education Level": [
         "No certificate",
@@ -111,7 +112,7 @@ OPTIONS = {
         "Certificate (Polytechnic/University)",
         "Diploma",
         "Bachelor's Degree",
-    ],  # 0..8 -> dummy (k)=1 if index==k for k=1..8
+    ],  # 0..8 -> dummies (1..8)
 
     "Occupation": [
         "Unemployed",
@@ -121,10 +122,10 @@ OPTIONS = {
         "Homemaker",
         "Student",
         "Government retiree",
-    ],  # 0..6 -> dummy (k)=1 if index==k for k=1..6
+    ],  # 0..6 -> dummies (1..6)
 
-    "Household Size": ["1 person", "2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummy (k)=1 if index==k for k=1..4
-    "Number of Dependents": ["None", "1–2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummy (k)=1 if index==k for k=1..4
+    "Household Size": ["1 person", "2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummies (1..4)
+    "Number of Dependents": ["None", "1–2 people", "3–4 people", "5–6 people", "7 people or more"],  # 0..4 -> dummies (1..4)
 
     "Type of Rental Housing": [
         "House",
@@ -135,9 +136,9 @@ OPTIONS = {
         "Terrace House (Single storey)",
         "Terrace House (Double storey)",
         "One-unit house",
-    ],  # 0..7 -> model has dummies (1..5) only; other indices treated as base (0)
+    ],  # 0..7 -> model has dummies (1..5) only; others treated as base (0)
 
-    "Furnished Type": ["None", "Furnished"],  # 0,1 -> dummy (1)=1 if Furnished
+    "Furnished Type": ["None", "Furnished"],  # dummy(1)=1 if Furnished
 
     "Deposit": [
         "No deposit",
@@ -147,24 +148,24 @@ OPTIONS = {
         "1 + 1 + utility",
         "2 + 1 + utility",
         "3 + 1 + utility",
-    ],  # 0..6 -> dummy (k)=1 if index==k for k=1..6
+    ],  # 0..6 -> dummies (1..6)
 
-    "Total years renting": ["Less than 6 months", "Less than 1 year", "1–2 years", "3–5 years", "6–10 years"],  # 0..4 -> dummy (k)=1 if index==k for k=1..4
+    "Total years renting": ["Less than 6 months", "Less than 1 year", "1–2 years", "3–5 years", "6–10 years"],  # 0..4 -> dummies (1..4)
 
-    "Known SMART SEWA": ["Yes", "No"],  # 0,1 -> dummy (1)=1 if No
+    "Known SMART SEWA": ["Yes", "No"],  # dummy(1)=1 if No
 }
 
-# ---------- Stable logistic ----------
+# -------------------- numerically-stable logistic --------------------
 def logistic(z: float) -> float:
     if z >= 0:
         ez = math.exp(-z)
-        return 1 / (1 + ez)
+        return 1.0 / (1.0 + ez)
     ez = math.exp(z)
-    return ez / (1 + ez)
+    return ez / (1.0 + ez)
 
-# ---------- Build INPUT dictionary (0/1 dummies + continuous age + constant=1) ----------
+# -------------------- Build INPUT vector (0/1 dummies + age + constant=1) --------------------
 def build_inputs(
-    umur: int,
+    age: int,
     gender_idx: int,
     nationality_idx: int,
     ethnicity_idx: int,
@@ -182,9 +183,8 @@ def build_inputs(
 ) -> dict:
     inp = {k: 0.0 for k in COEF.keys()}
     inp["Constant"] = 1.0
-    inp["Umur"] = float(umur)
+    inp["Umur"] = float(age)
 
-    # Binary dummies (index 1 => variable(1)=1)
     inp["Jantina ketua keluarga(1)"] = 1.0 if gender_idx == 1 else 0.0
     inp["Warganegara(1)"] = 1.0 if nationality_idx == 1 else 0.0
 
@@ -209,7 +209,6 @@ def build_inputs(
     for k in range(1, 5):
         inp[f"Bilangan tanggungan({k})"] = 1.0 if dep_idx == k else 0.0
 
-    # Rental Type: coefficients available only for (1..5)
     for k in range(1, 6):
         inp[f"Jenis rumah sewa({k})"] = 1.0 if rental_idx == k else 0.0
 
@@ -225,52 +224,60 @@ def build_inputs(
 
     return inp
 
-# ---------- Compute z exactly as SUM(COEF*INPUT) ----------
-def compute_table_and_scores(inputs: dict) -> tuple[pd.DataFrame, float, float]:
+# -------------------- Compute table + (z,p) --------------------
+def compute_table(inputs: dict) -> tuple[pd.DataFrame, float, float]:
     rows = []
-    z = 0.0
     for var, coef in COEF.items():
         x = float(inputs.get(var, 0.0))
-        prod = float(coef) * x
-        rows.append({"Variable": var, "COEF": float(coef), "INPUT": x, "COEF*INPUT": prod})
-        z += prod
+        rows.append(
+            {
+                "Variable": var,
+                "COEF": float(coef),
+                "INPUT": x,
+                "COEF×INPUT": float(coef) * x,
+            }
+        )
     df = pd.DataFrame(rows)
-    # IMPORTANT: z is exactly the sum of COEF*INPUT column
-    z = float(df["COEF*INPUT"].sum())
-    p = logistic(z)
+    # z is EXACTLY the sum of COEF×INPUT column:
+    z = float(df["COEF×INPUT"].sum())
+    p = float(logistic(z))
     return df, z, p
 
-# ---------- Theme (toggle at top) ----------
-top_l, top_r = st.columns([0.78, 0.22])
+# ======================== TOP BAR (toggle on top) ========================
+top_l, top_r = st.columns([0.78, 0.22], vertical_alignment="center")
 with top_l:
     st.markdown("## Rental Affordability Checker")
-    st.caption("Condition A uses a logistic model. Condition B uses the rent-to-income rule. Overall = Afford only if both are satisfied.")
+    st.caption("Two checks are applied: Condition A (Logistic model) and Condition B (Rent ≤ ratio×Income). Overall = Afford only if both are satisfied.")
 with top_r:
-    dark_mode = st.toggle("Dark mode", value=False)
+    dark_mode = st.toggle("Dark mode", value=True)
 
+# ======================== THEME ========================
 if dark_mode:
     PAGE_BG = "linear-gradient(180deg, #0b0b14 0%, #0b0b14 45%, #1a102b 100%)"
-    CARD_BG = "rgba(17, 24, 39, 0.65)"
+    CARD_BG = "rgba(17, 24, 39, 0.68)"
     BORDER = "rgba(167, 139, 250, 0.22)"
-    TXT = "#f8fafc"
-    SUB = "rgba(248,250,252,.75)"
+    TXT = "#f8fafc"  # white
     DF_TXT = "#e5e7eb"
+    MUTED = "rgba(248,250,252,.75)"
 else:
     PAGE_BG = "linear-gradient(180deg, #f7f2ff 0%, #f7f2ff 45%, #efe6ff 100%)"
-    CARD_BG = "rgba(255,255,255,0.80)"
+    CARD_BG = "rgba(255,255,255,0.84)"
     BORDER = "rgba(139, 92, 246, 0.20)"
-    TXT = "#2e1065"
-    SUB = "rgba(46,16,101,.72)"
+    TXT = "#111827"  # black-ish
     DF_TXT = "#111827"
+    MUTED = "rgba(17,24,39,.70)"
 
 st.markdown(
     f"""
 <style>
-  .stApp{{ background: {PAGE_BG} !important; color: {TXT}; }}
-  .block-container{{ padding-top: 0.8rem; }}
-  h1,h2,h3,h4,h5,h6, label, p, div, span, small {{ color: {TXT}; }}
+  .stApp {{
+    background: {PAGE_BG} !important;
+    color: {TXT} !important;
+  }}
+  .block-container {{ padding-top: .75rem; }}
 
-  .purple-card{{
+  /* Cards */
+  .purple-card {{
     background: {CARD_BG};
     border: 1px solid {BORDER};
     border-radius: 18px;
@@ -278,11 +285,37 @@ st.markdown(
     box-shadow: 0 12px 30px rgba(76, 29, 149, 0.10);
   }}
 
-  .chip{{ display:inline-block; padding: 6px 12px; border-radius: 999px; font-weight: 800; font-size: 12px;
-          border: 1px solid rgba(17,24,39,.12); background: rgba(255,255,255,.78); color: #111827; }}
-  .chip.ok{{ border-color: rgba(16,185,129,.35); color: #065f46; background: rgba(209,250,229,.90); }}
-  .chip.no{{ border-color: rgba(239,68,68,.35); color: #7f1d1d; background: rgba(254,226,226,.92); }}
+  /* Force label/text colors */
+  h1,h2,h3,h4,h5,h6, p, div, span, label, small {{
+    color: {TXT} !important;
+  }}
+  .muted {{
+    color: {MUTED} !important;
+  }}
 
+  /* Chips */
+  .chip {{
+    display:inline-block;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 12px;
+    border: 1px solid rgba(17,24,39,.12);
+    background: rgba(255,255,255,.78);
+    color: #111827 !important;
+  }}
+  .chip.ok {{
+    border-color: rgba(16,185,129,.35);
+    color: #065f46 !important;
+    background: rgba(209,250,229,.90);
+  }}
+  .chip.no {{
+    border-color: rgba(239,68,68,.35);
+    color: #7f1d1d !important;
+    background: rgba(254,226,226,.92);
+  }}
+
+  /* DataFrame text */
   div[data-testid="stDataFrame"] * {{
     color: {DF_TXT} !important;
   }}
@@ -292,37 +325,38 @@ st.markdown(
 )
 
 def chip(label: str, ok: bool) -> str:
-    cls = "ok" if ok else "no"
-    return f'<span class="chip {cls}">{label}</span>'
+    return f'<span class="chip {"ok" if ok else "no"}">{label}</span>'
 
-# ---------- Inputs layout ----------
+# ======================== INPUTS ========================
 left, right = st.columns([1, 1.35], gap="large")
 
 with left:
     st.markdown('<div class="purple-card">', unsafe_allow_html=True)
     st.subheader("User Inputs")
 
-    a, b = st.columns(2)
-    with a:
-        umur = st.number_input("Age (years)", min_value=15, max_value=100, value=38, step=1)
+    colA, colB = st.columns(2)
+    with colA:
+        age = st.number_input("Age (years)", min_value=15, max_value=100, value=38, step=1)
         gender = st.selectbox("Gender", OPTIONS["Gender"], index=0)
         nationality = st.selectbox("Nationality", OPTIONS["Nationality"], index=0)
         ethnicity = st.selectbox("Ethnicity", OPTIONS["Ethnicity"], index=0)
         religion = st.selectbox("Religion", OPTIONS["Religion"], index=0)
         marital = st.selectbox("Marital Status", OPTIONS["Marital Status"], index=0)
         edu = st.selectbox("Education Level", OPTIONS["Education Level"], index=0)
-    with b:
+
+    with colB:
         job = st.selectbox("Occupation", OPTIONS["Occupation"], index=0)
         household = st.selectbox("Household Size", OPTIONS["Household Size"], index=0)
-        dep = st.selectbox("Number of Dependents", OPTIONS["Number of Dependents"], index=0)
-        rental_type = st.selectbox("Type of Rental Housing", OPTIONS["Type of Rental Housing"], index=0)
-        furnish = st.selectbox("Furnished Type", OPTIONS["Furnished Type"], index=0)
+        dependents = st.selectbox("Number of Dependents", OPTIONS["Number of Dependents"], index=0)
+        rental = st.selectbox("Type of Rental Housing", OPTIONS["Type of Rental Housing"], index=0)
+        furnished = st.selectbox("Furnished Type", OPTIONS["Furnished Type"], index=0)
         deposit = st.selectbox("Deposit", OPTIONS["Deposit"], index=0)
         years = st.selectbox("Total years renting", OPTIONS["Total years renting"], index=0)
         smart = st.selectbox("Known SMART SEWA", OPTIONS["Known SMART SEWA"], index=0)
 
     st.divider()
     st.subheader("Income & Rent Inputs")
+
     c1, c2, c3 = st.columns(3)
     with c1:
         income = st.number_input("Monthly Income (RM)", min_value=0.0, value=6000.0, step=100.0)
@@ -334,13 +368,13 @@ with left:
     run = st.button("✅ Run Check", use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ---------- Results: show ONLY after clicking Run ----------
+# ======================== RESULTS (ONLY AFTER RUN) ========================
 if "result" not in st.session_state:
     st.session_state["result"] = None
 
 if run:
     inputs = build_inputs(
-        umur=int(umur),
+        age=int(age),
         gender_idx=OPTIONS["Gender"].index(gender),
         nationality_idx=OPTIONS["Nationality"].index(nationality),
         ethnicity_idx=OPTIONS["Ethnicity"].index(ethnicity),
@@ -349,15 +383,15 @@ if run:
         edu_idx=OPTIONS["Education Level"].index(edu),
         job_idx=OPTIONS["Occupation"].index(job),
         household_idx=OPTIONS["Household Size"].index(household),
-        dep_idx=OPTIONS["Number of Dependents"].index(dep),
-        rental_idx=OPTIONS["Type of Rental Housing"].index(rental_type),
-        furnish_idx=OPTIONS["Furnished Type"].index(furnish),
+        dep_idx=OPTIONS["Number of Dependents"].index(dependents),
+        rental_idx=OPTIONS["Type of Rental Housing"].index(rental),
+        furnish_idx=OPTIONS["Furnished Type"].index(furnished),
         deposit_idx=OPTIONS["Deposit"].index(deposit),
         years_idx=OPTIONS["Total years renting"].index(years),
         smart_idx=OPTIONS["Known SMART SEWA"].index(smart),
     )
 
-    df, z, p = compute_table_and_scores(inputs)
+    df, z, p = compute_table(inputs)
 
     ok_a = p >= 0.5
     cond_a = "Afford" if ok_a else "Not Afford"
@@ -374,9 +408,9 @@ if run:
         "z": z,
         "p": p,
         "threshold": threshold,
+        "ratio": ratio,
         "income": income,
         "rent": rent,
-        "ratio": ratio,
         "ok_a": ok_a,
         "ok_b": ok_b,
         "ok_all": ok_all,
@@ -392,7 +426,7 @@ with right:
     st.subheader("Results")
 
     if res is None:
-        st.info("Click **Run Check** to generate results and the calculation table.")
+        st.info("Click **Run Check** to show results and the calculation table.")
         st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.markdown(
@@ -407,12 +441,11 @@ with right:
         )
 
         m1, m2, m3 = st.columns(3)
-        m1.metric("SUM(INPUT×COEF)  (z)", f'{res["z"]:.6f}')
-        m2.metric("Probability p = 1/(1+exp(-z))", f'{res["p"]:.9f}')
-        m3.metric(f"{res['ratio']:.2f} × Income (RM)", f'{res["threshold"]:.2f}')
+        m1.metric("SUM(COEF×INPUT)  (z)", f"{res['z']:.6f}")
+        m2.metric("Probability p = 1/(1+exp(-z))", f"{res['p']:.9f}")
+        m3.metric(f"{res['ratio']:.2f} × Income (RM)", f"{res['threshold']:.2f}")
 
-        st.write("")
-        st.caption("Calculation table (COEF, INPUT, COEF×INPUT). Note: z is exactly the sum of the COEF×INPUT column.")
+        st.caption("Calculation table (COEF, INPUT, COEF×INPUT). z is exactly the sum of the COEF×INPUT column.")
         st.dataframe(res["df"], use_container_width=True, height=520)
 
         csv = res["df"].to_csv(index=False).encode("utf-8")
@@ -424,17 +457,16 @@ with right:
             use_container_width=True,
         )
 
-        st.write("")
         st.markdown(
             """
 **Rules used**
 - Condition A: `IF( p >= 0.5 , "Afford" , "Not Afford")`
 - Condition B: `IF( Rent <= ratio×Income , "Afford" , "Not Afford")`
 - Overall: `IF( AND(ConditionA, ConditionB) , "Afford" , "Not Afford")`
-"""
+""",
         )
         st.markdown("</div>", unsafe_allow_html=True)
 '''
 Path("/mnt/data/app.py").write_text(code, encoding="utf-8")
-"saved /mnt/data/app.py"
+"/mnt/data/app.py written"
 
