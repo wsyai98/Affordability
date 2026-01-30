@@ -37,62 +37,60 @@ def logo_strip_html(paths, height_px=42, gap_px=10):
 
 st.set_page_config(page_title="Rental Affordability Checker", layout="wide")
 
-# -------------------- COEFFICIENTS --------------------
+# -------------------- COEFFICIENTS (UPDATED TO MATCH YOUR PIC: COLUMN B) --------------------
 COEF = {
-    "Umur": -0.006,
-    "Jantina ketua keluarga(1)": 0.04,
-    "Warganegara(1)": -2.49,
-    "Bangsa(1)": -1.222,
-    "Bangsa(2)": -1.693,
-    "Bangsa(3)": 17.641,
-    "Bangsa(4)": 1.828,
-    "Agama(1)": -0.291,
-    "Agama(2)": -15.98,
-    "Agama(3)": 0.175,
-    "Status Perkahwinan(1)": -25.465,
-    "Status Perkahwinan(2)": 1.468,
-    "Status Perkahwinan(3)": -0.114,
-    "Status Perkahwinan(4)": 20.673,
-    "Tahap Pendidikan(1)": -0.292,
-    "Tahap Pendidikan(2)": -0.27,
-    "Tahap Pendidikan(3)": -0.371,
-    "Tahap Pendidikan(4)": -22.714,
-    "Tahap Pendidikan(5)": 20.045,
-    "Tahap Pendidikan(6)": -1.436,
-    "Tahap Pendidikan(7)": 18.556,
-    "Tahap Pendidikan(8)": 30.823,
-    "Pekerjaan(1)": -19.721,
-    "Pekerjaan(2)": -20.39,
-    "Pekerjaan(3)": -18.736,
-    "Pekerjaan(4)": -20.434,
-    "Pekerjaan(5)": -35.097,
-    "Pekerjaan(6)": 0.085,
-    "Bilangan isi rumah(1)": -0.392,
-    "Bilangan isi rumah(2)": -0.398,
-    "Bilangan isi rumah(3)": -0.012,
-    "Bilangan isi rumah(4)": 0.158,
-    "Bilangan tanggungan(1)": 0.729,
-    "Bilangan tanggungan(2)": -1.316,
-    "Bilangan tanggungan(3)": 20.145,
-    "Bilangan tanggungan(4)": 17.796,
-    "Jenis rumah sewa(1)": 0.307,
-    "Jenis rumah sewa(2)": -0.493,
-    "Jenis rumah sewa(3)": 0.579,
-    "Jenis rumah sewa(4)": -0.331,
-    "Jenis rumah sewa(5)": 18.194,
-    "Jenis kelengkapan perabot(1)": -0.46,
-    "Bayaran deposit(1)": 1.511,
-    "Bayaran deposit(2)": 0.841,
-    "Bayaran deposit(3)": 1.496,
-    "Bayaran deposit(4)": 1.975,
-    "Bayaran deposit(5)": -0.487,
-    "Bayaran deposit(6)": 18.336,
-    "Berapa lama anda telah menyewa rumah(1)": -17.564,
-    "Berapa lama anda telah menyewa rumah(2)": -18.419,
-    "Berapa lama anda telah menyewa rumah(3)": -17.135,
-    "Berapa lama anda telah menyewa rumah(4)": -18.69,
-    "Adakah anda mengetahui terdapat skim mampu sewa di Malaysia? (contoh: SMART sewa)(1)": 0.531,
-    "Constant": 38.956,
+    "Umur": 0.002,
+    "Jantina ketua keluarga(1)": 0.007,  # Perempuan(1)
+    "Warganegara(1)": -0.818,            # Non-Malaysian citizen(1)
+
+    "Bangsa=Cina(1)": -0.411,
+    "Bangsa=India(1)": 0.463,
+    "Bangsa=Lain-lain(1)": 0.849,
+
+    "Agama=Buddha(1)": 0.131,
+    "Agama=Hindu(1)": -0.525,
+    "Agama=Lain-lain(1)": -0.158,
+
+    "Status Perkahwinan=Berkahwin(1)": -0.007,
+    "Status Perkahwinan=Cerai/BaluDuda/Pisah(1)": 0.313,
+
+    "Tahap Pendidikan=Undergraduate(1)": -0.537,
+    "Tahap Pendidikan=Postgraduate(1)": -0.808,
+
+    "Pekerjaan=Bekerja sendiri(1)": 0.198,
+    "Pekerjaan=Lain-lain(1)": -0.801,
+    "Pekerjaan=Pekerja Kerajaan(1)": 0.803,
+    "Pekerjaan=Pekerja Swasta(1)": 0.912,
+    "Pekerjaan=Pesara(1)": 0.018,
+
+    "Bilangan isi rumah=3-4 orang(1)": 0.096,
+    "Bilangan isi rumah=5+ orang(1)": -0.403,
+
+    "Bilangan tanggungan=3-4 orang(1)": -0.028,
+    "Bilangan tanggungan=5+ orang(1)": -0.134,
+
+    "Jenis Penyewaan=Bilik(1)": 1.121,
+
+    "Jenis rumah sewa=Kondominium(1)": -1.007,
+    "Jenis rumah sewa=Lain-lain(1)": -0.598,
+    "Jenis rumah sewa=Pangsapuri(1)": -0.604,
+    "Jenis rumah sewa=Rumah 1 unit(1)": -0.711,
+    "Jenis rumah sewa=Rumah Teres(1)": 0.526,  # 1 tingkat / 2 tingkat(1)
+
+    "Jenis kelengkapan perabot=Berperabot penuh(1)": -0.053,
+    "Jenis kelengkapan perabot=Berperabot separa(1)": -0.370,
+
+    "deposit_1_1(1)": 0.339,
+    "deposit_2_1(1)": 0.556,
+    "deposit_3_1(1)": 0.686,
+
+    "Berapa lama anda telah menyewa rumah=3-5 tahun(1)": 0.413,
+    "Berapa lama anda telah menyewa rumah=6+ tahun(1)": -0.584,
+
+    # In your output: SMA = Tidak(1) has coef 0.200
+    "Adakah anda mengetahui terdapat skim mampu sewa di Malaysia? (contoh: SMART sewa)(1)": 0.200,
+
+    "Constant": 0.310,
 }
 
 # -------------------- ENGLISH OPTIONS --------------------
@@ -178,35 +176,113 @@ def build_inputs(
     inp["Constant"] = 1.0
     inp["Umur"] = float(age)
 
+    # Gender: Woman(1)
     inp["Jantina ketua keluarga(1)"] = 1.0 if gender_idx == 1 else 0.0
+
+    # Nationality: Non-Malaysian(1)
     inp["Warganegara(1)"] = 1.0 if nationality_idx == 1 else 0.0
 
-    for k in range(1, 5):
-        inp[f"Bangsa({k})"] = 1.0 if ethnicity_idx == k else 0.0
-    for k in range(1, 4):
-        inp[f"Agama({k})"] = 1.0 if religion_idx == k else 0.0
-    for k in range(1, 5):
-        inp[f"Status Perkahwinan({k})"] = 1.0 if marital_idx == k else 0.0
-    for k in range(1, 9):
-        inp[f"Tahap Pendidikan({k})"] = 1.0 if edu_idx == k else 0.0
-    for k in range(1, 7):
-        inp[f"Pekerjaan({k})"] = 1.0 if job_idx == k else 0.0
-    for k in range(1, 5):
-        inp[f"Bilangan isi rumah({k})"] = 1.0 if household_idx == k else 0.0
-    for k in range(1, 5):
-        inp[f"Bilangan tanggungan({k})"] = 1.0 if dep_idx == k else 0.0
+    # Ethnicity base: Malay; dummies: Chinese, Indian, Others
+    eth_label = OPTIONS["Ethnicity"][ethnicity_idx]
+    if eth_label == "Chinese":
+        inp["Bangsa=Cina(1)"] = 1.0
+    elif eth_label == "Indian":
+        inp["Bangsa=India(1)"] = 1.0
+    elif eth_label != "Malay":
+        inp["Bangsa=Lain-lain(1)"] = 1.0
 
-    for k in range(1, 6):
-        inp[f"Jenis rumah sewa({k})"] = 1.0 if rental_code == k else 0.0
+    # Religion base: Islam; dummies: Buddhism, Hinduism, Others
+    rel_label = OPTIONS["Religion"][religion_idx]
+    if rel_label == "Buddhism":
+        inp["Agama=Buddha(1)"] = 1.0
+    elif rel_label == "Hinduism":
+        inp["Agama=Hindu(1)"] = 1.0
+    elif rel_label != "Islam":
+        inp["Agama=Lain-lain(1)"] = 1.0
 
-    inp["Jenis kelengkapan perabot(1)"] = 1.0 if furnish_idx == 1 else 0.0
+    # Marital base: Single; dummies: Married, (Widowed/Divorced/Separated combined)
+    mar_label = OPTIONS["Marital Status"][marital_idx]
+    if mar_label == "Married":
+        inp["Status Perkahwinan=Berkahwin(1)"] = 1.0
+    elif mar_label in ("Widowed", "Divorced", "Separated"):
+        inp["Status Perkahwinan=Cerai/BaluDuda/Pisah(1)"] = 1.0
 
-    for k in range(1, 7):
-        inp[f"Bayaran deposit({k})"] = 1.0 if deposit_idx == k else 0.0
-    for k in range(1, 5):
-        inp[f"Berapa lama anda telah menyewa rumah({k})"] = 1.0 if years_idx == k else 0.0
+    # Education base: SPM and below; dummies: Undergraduate, Postgraduate
+    # (No postgraduate option in your current UI, so it stays 0 unless you add it later.)
+    edu_label = OPTIONS["Education Level"][edu_idx]
+    if edu_label in ("Diploma", "Bachelor's Degree"):
+        inp["Tahap Pendidikan=Undergraduate(1)"] = 1.0
 
+    # Occupation base: Unemployed; dummies per your pic
+    job_label = OPTIONS["Occupation"][job_idx]
+    if job_label == "Self-employed":
+        inp["Pekerjaan=Bekerja sendiri(1)"] = 1.0
+    elif job_label == "Government employee":
+        inp["Pekerjaan=Pekerja Kerajaan(1)"] = 1.0
+    elif job_label == "Private employee":
+        inp["Pekerjaan=Pekerja Swasta(1)"] = 1.0
+    elif job_label == "Government retiree":
+        inp["Pekerjaan=Pesara(1)"] = 1.0
+    elif job_label in ("Homemaker", "Student"):
+        inp["Pekerjaan=Lain-lain(1)"] = 1.0
+
+    # Household size base: <2; dummies: 3-4, 5+
+    if household_idx == 2:
+        inp["Bilangan isi rumah=3-4 orang(1)"] = 1.0
+    elif household_idx in (3, 4):
+        inp["Bilangan isi rumah=5+ orang(1)"] = 1.0
+
+    # Dependents base: <=2; dummies: 3-4, 5+
+    if dep_idx == 2:
+        inp["Bilangan tanggungan=3-4 orang(1)"] = 1.0
+    elif dep_idx in (3, 4):
+        inp["Bilangan tanggungan=5+ orang(1)"] = 1.0
+
+    # Jenis Penyewaan=Bilik(1) (no direct UI field here, keep 0.0 by default)
+
+    # Type of Rental Housing -> Jenis rumah sewa dummies
+    # Use the label (already selected) through rental_code mapping outside.
+    # We'll infer by rental_code / label mapping with current options:
+    # Flat/Apartment -> Pangsapuri, Condominium -> Kondominium, Terrace -> Rumah Teres, One-unit -> Rumah 1 unit
+    # Lain-lain not present in UI -> stays 0.
+    # NOTE: rental_code values are [2..7] but we decide based on the label (more stable).
+    # We'll rebuild the label from rental_code by using the codes list:
+    # (You already computed rental_label earlier, so rental_code is consistent.)
+    # We'll map based on rental_code meaning via UI labels order:
+    # 2 Flat, 3 Apartment, 4 Condominium, 5 Terrace single, 6 Terrace double, 7 One-unit
+    if rental_code == 4:
+        inp["Jenis rumah sewa=Kondominium(1)"] = 1.0
+    elif rental_code in (2, 3):
+        inp["Jenis rumah sewa=Pangsapuri(1)"] = 1.0
+    elif rental_code in (5, 6):
+        inp["Jenis rumah sewa=Rumah Teres(1)"] = 1.0
+    elif rental_code == 7:
+        inp["Jenis rumah sewa=Rumah 1 unit(1)"] = 1.0
+
+    # Furnished type -> perabot penuh (1) if Furnished
+    if furnish_idx == 1:
+        inp["Jenis kelengkapan perabot=Berperabot penuh(1)"] = 1.0
+    # Berperabot separa(1) not in UI -> stays 0.0
+
+    # Deposit: only map 1+1, 2+1, 3+1 (no utility)
+    dep_label = OPTIONS["Deposit"][deposit_idx]
+    if dep_label == "1 + 1":
+        inp["deposit_1_1(1)"] = 1.0
+    elif dep_label == "2 + 1":
+        inp["deposit_2_1(1)"] = 1.0
+    elif dep_label == "3 + 1":
+        inp["deposit_3_1(1)"] = 1.0
+
+    # Years renting: base <3 years; dummies 3-5, 6+
+    if years_idx == 3:
+        inp["Berapa lama anda telah menyewa rumah=3-5 tahun(1)"] = 1.0
+    elif years_idx == 4:
+        inp["Berapa lama anda telah menyewa rumah=6+ tahun(1)"] = 1.0
+
+    # SMART SEWA knowledge: in your output it is "Tidak(1)".
+    # OPTIONS["Known SMART SEWA"] = ["Yes", "No"], so idx==1 means "No".
     inp["Adakah anda mengetahui terdapat skim mampu sewa di Malaysia? (contoh: SMART sewa)(1)"] = 1.0 if smart_idx == 1 else 0.0
+
     return inp
 
 
