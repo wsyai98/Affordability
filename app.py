@@ -146,69 +146,76 @@ def clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, x))
 
 
+def _arc_path(cx, cy, r, a0_deg, a1_deg):
+    # SVG arc from a0->a1 in degrees (0deg = +x axis). We draw semicircle using negative angles.
+    a0 = math.radians(a0_deg)
+    a1 = math.radians(a1_deg)
+    x0, y0 = cx + r * math.cos(a0), cy + r * math.sin(a0)
+    x1, y1 = cx + r * math.cos(a1), cy + r * math.sin(a1)
+    large = 1 if abs(a1_deg - a0_deg) > 180 else 0
+    sweep = 1
+    return f"M {x0:.2f} {y0:.2f} A {r:.2f} {r:.2f} 0 {large} {sweep} {x1:.2f} {y1:.2f}"
+
+
 def svg_gauge_html(title: str, value_0_1: float, threshold_0_1: float, subtitle_left: str, subtitle_right: str) -> str:
     """
-    Robust semicircle meter using inline SVG (fixes the 'meter not appear' issue).
+    Meter in inline SVG.
+    FIX: we must NOT include '<!-- -->' comments (Streamlit may render them as text).
     """
     v = clamp(value_0_1, 0.0, 1.0)
     t = clamp(threshold_0_1, 0.0, 1.0)
 
-    # geometry
-    W, H = 260, 150
-    cx, cy = W / 2, 130
+    W, H = 300, 190
+    cx, cy = W / 2, 150
     r = 95
 
-    # angles (degrees): -180 (left) to 0 (right) for semicircle
-    def angle_deg(p):
+    # map p in [0,1] to angle in degrees for TOP semicircle: left (-180) to right (0)
+    def p_to_deg(p):
         return -180 + (p * 180.0)
 
-    def polar_to_xy(deg):
-        rad = math.radians(deg)
-        x = cx + r * math.cos(rad)
-        y = cy + r * math.sin(rad)
-        return x, y
-
-    def arc_path(a0, a1):
-        x0, y0 = polar_to_xy(a0)
-        x1, y1 = polar_to_xy(a1)
-        large = 1 if (a1 - a0) > 180 else 0
-        return f"M {x0:.2f} {y0:.2f} A {r} {r} 0 {large} 1 {x1:.2f} {y1:.2f}"
-
-    # segments (visual)
+    # colored segments (visual only)
     segs = [
-        (0.0, 0.10, "rgba(239,68,68,0.85)"),
+        (0.00, 0.10, "rgba(239,68,68,0.85)"),
         (0.10, 0.40, "rgba(245,158,11,0.85)"),
         (0.40, 1.00, "rgba(34,197,94,0.85)"),
     ]
 
-    # needle
-    nd = angle_deg(v)
-    nx, ny = polar_to_xy(nd)
-    tx = cx + (r - 8) * math.cos(math.radians(nd))
-    ty = cy + (r - 8) * math.sin(math.radians(nd))
-
     # threshold tick
-    td = angle_deg(t)
+    td = p_to_deg(t)
     tx1 = cx + (r - 2) * math.cos(math.radians(td))
     ty1 = cy + (r - 2) * math.sin(math.radians(td))
-    tx2 = cx + (r - 22) * math.cos(math.radians(td))
-    ty2 = cy + (r - 22) * math.sin(math.radians(td))
+    tx2 = cx + (r - 24) * math.cos(math.radians(td))
+    ty2 = cy + (r - 24) * math.sin(math.radians(td))
+
+    # needle
+    nd = p_to_deg(v)
+    nx = cx + (r - 10) * math.cos(math.radians(nd))
+    ny = cy + (r - 10) * math.sin(math.radians(nd))
+
+    paths = []
+    for a0, a1, col in segs:
+        paths.append(
+            f'<path d="{_arc_path(cx, cy, r, p_to_deg(a0), p_to_deg(a1))}" '
+            f'stroke="{col}" stroke-width="16" fill="none" stroke-linecap="round" />'
+        )
 
     return f"""
 <div class="gauge-card">
   <div class="gauge-title">{title}</div>
 
-  <svg width="{W}" height="{H}" viewBox="0 0 {W} {H}">
-    <!-- arc segments -->
-    {''.join([f'<path d="{arc_path(angle_deg(a0), angle_deg(a1))}" stroke="{col}" stroke-width="16" fill="none" stroke-linecap="round"/>' for a0,a1,col in segs])}
+  <div style="display:flex; justify-content:center;">
+    <svg width="{W}" height="{H}" viewBox="0 0 {W} {H}">
+      {''.join(paths)}
 
-    <!-- threshold tick -->
-    <line x1="{tx1:.2f}" y1="{ty1:.2f}" x2="{tx2:.2f}" y2="{ty2:.2f}" stroke="rgba(255,255,255,0.85)" stroke-width="3" />
+      <line x1="{tx1:.2f}" y1="{ty1:.2f}" x2="{tx2:.2f}" y2="{ty2:.2f}"
+            stroke="rgba(255,255,255,0.85)" stroke-width="3" stroke-linecap="round" />
 
-    <!-- needle -->
-    <line x1="{cx:.2f}" y1="{cy:.2f}" x2="{tx:.2f}" y2="{ty:.2f}" stroke="rgba(17,24,39,0.95)" stroke-width="4" stroke-linecap="round" />
-    <circle cx="{cx:.2f}" cy="{cy:.2f}" r="7" fill="rgba(17,24,39,0.95)" stroke="rgba(255,255,255,0.35)" stroke-width="2" />
-  </svg>
+      <line x1="{cx:.2f}" y1="{cy:.2f}" x2="{nx:.2f}" y2="{ny:.2f}"
+            stroke="rgba(17,24,39,0.95)" stroke-width="4" stroke-linecap="round" />
+      <circle cx="{cx:.2f}" cy="{cy:.2f}" r="7"
+              fill="rgba(17,24,39,0.95)" stroke="rgba(255,255,255,0.35)" stroke-width="2" />
+    </svg>
+  </div>
 
   <div class="gauge-value">{(v*100):.2f}%</div>
   <div class="gauge-sub">
@@ -623,7 +630,6 @@ with right:
         st.info("Click **Run Check** to show results and the calculation table.")
         st.markdown("</div>", unsafe_allow_html=True)
     else:
-        # ===== summary highlight (keep like before) =====
         st.markdown(
             f"""
 <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
@@ -635,11 +641,11 @@ with right:
             unsafe_allow_html=True,
         )
 
-        # ===== meters (fixed) =====
+        # ===== meters (render with components.html to prevent raw svg showing as text) =====
         g1, g2 = st.columns(2)
 
         with g1:
-            st.markdown(
+            st.components.v1.html(
                 svg_gauge_html(
                     title="Condition A Meter (Probability p)",
                     value_0_1=float(res["p"]),
@@ -647,14 +653,15 @@ with right:
                     subtitle_left="Low",
                     subtitle_right=f"Pass at {P_THRESHOLD:.2f}",
                 ),
-                unsafe_allow_html=True,
+                height=265,
+                scrolling=False,
             )
 
         with g2:
             ratio_v = float(res["ratio"])
             share = float(res["rent_share"])
             closeness = clamp(share / ratio_v, 0.0, 1.0) if ratio_v > 0 else 0.0
-            st.markdown(
+            st.components.v1.html(
                 svg_gauge_html(
                     title="Condition B Meter (Rent vs Threshold)",
                     value_0_1=float(closeness),
@@ -662,10 +669,10 @@ with right:
                     subtitle_left=f"Rent/Income: {share:.2f}",
                     subtitle_right=f"Threshold: {ratio_v:.2f}",
                 ),
-                unsafe_allow_html=True,
+                height=265,
+                scrolling=False,
             )
 
-        # ===== metrics =====
         m1, m2, m3 = st.columns(3)
         m1.metric("SUM(COEF×INPUT)  (z)", f"{res['z']:.6f}")
         m2.metric("Probability p = 1/(1+exp(-z))", f"{res['p']:.9f}")
