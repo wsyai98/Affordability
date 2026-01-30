@@ -147,7 +147,6 @@ def clamp(x: float, lo: float, hi: float) -> float:
 
 
 def _arc_path(cx, cy, r, a0_deg, a1_deg):
-    # SVG arc from a0->a1 in degrees (0deg = +x axis). We draw semicircle using negative angles.
     a0 = math.radians(a0_deg)
     a1 = math.radians(a1_deg)
     x0, y0 = cx + r * math.cos(a0), cy + r * math.sin(a0)
@@ -157,10 +156,20 @@ def _arc_path(cx, cy, r, a0_deg, a1_deg):
     return f"M {x0:.2f} {y0:.2f} A {r:.2f} {r:.2f} 0 {large} {sweep} {x1:.2f} {y1:.2f}"
 
 
-def svg_gauge_html(title: str, value_0_1: float, threshold_0_1: float, subtitle_left: str, subtitle_right: str) -> str:
+def svg_gauge_html(
+    title: str,
+    value_0_1: float,
+    threshold_0_1: float,
+    subtitle_left: str,
+    subtitle_right: str,
+    text_color: str,
+    border_color: str,
+) -> str:
     """
-    Meter in inline SVG.
-    FIX: we must NOT include '<!-- -->' comments (Streamlit may render them as text).
+    Meter in inline SVG (wrapped in its own HTML so it renders consistently).
+    Fixes:
+    - No raw SVG/code showing
+    - Text color follows Dark/Light mode
     """
     v = clamp(value_0_1, 0.0, 1.0)
     t = clamp(threshold_0_1, 0.0, 1.0)
@@ -169,25 +178,21 @@ def svg_gauge_html(title: str, value_0_1: float, threshold_0_1: float, subtitle_
     cx, cy = W / 2, 150
     r = 95
 
-    # map p in [0,1] to angle in degrees for TOP semicircle: left (-180) to right (0)
     def p_to_deg(p):
         return -180 + (p * 180.0)
 
-    # colored segments (visual only)
     segs = [
         (0.00, 0.10, "rgba(239,68,68,0.85)"),
         (0.10, 0.40, "rgba(245,158,11,0.85)"),
         (0.40, 1.00, "rgba(34,197,94,0.85)"),
     ]
 
-    # threshold tick
     td = p_to_deg(t)
     tx1 = cx + (r - 2) * math.cos(math.radians(td))
     ty1 = cy + (r - 2) * math.sin(math.radians(td))
     tx2 = cx + (r - 24) * math.cos(math.radians(td))
     ty2 = cy + (r - 24) * math.sin(math.radians(td))
 
-    # needle
     nd = p_to_deg(v)
     nx = cx + (r - 10) * math.cos(math.radians(nd))
     ny = cy + (r - 10) * math.sin(math.radians(nd))
@@ -199,30 +204,72 @@ def svg_gauge_html(title: str, value_0_1: float, threshold_0_1: float, subtitle_
             f'stroke="{col}" stroke-width="16" fill="none" stroke-linecap="round" />'
         )
 
+    # IMPORTANT: components.html runs in an iframe. We set body background transparent and force text color.
     return f"""
-<div class="gauge-card">
-  <div class="gauge-title">{title}</div>
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body {{
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    color: {text_color};
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }}
+  .gauge-card {{
+    border: 1px solid {border_color};
+    background: rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 12px 12px;
+  }}
+  .gauge-title {{
+    font-weight: 800;
+    margin-bottom: 6px;
+    opacity: .95;
+    color: {text_color};
+  }}
+  .gauge-value {{
+    font-weight: 900;
+    font-size: 20px;
+    margin-top: -4px;
+    color: {text_color};
+  }}
+  .gauge-sub {{
+    display:flex;
+    justify-content: space-between;
+    font-size: 12px;
+    opacity: .82;
+    margin-top: 2px;
+    color: {text_color};
+  }}
+</style>
+</head>
+<body>
+  <div class="gauge-card">
+    <div class="gauge-title">{title}</div>
 
-  <div style="display:flex; justify-content:center;">
-    <svg width="{W}" height="{H}" viewBox="0 0 {W} {H}">
-      {''.join(paths)}
+    <div style="display:flex; justify-content:center;">
+      <svg width="{W}" height="{H}" viewBox="0 0 {W} {H}">
+        {''.join(paths)}
+        <line x1="{tx1:.2f}" y1="{ty1:.2f}" x2="{tx2:.2f}" y2="{ty2:.2f}"
+              stroke="rgba(255,255,255,0.85)" stroke-width="3" stroke-linecap="round" />
+        <line x1="{cx:.2f}" y1="{cy:.2f}" x2="{nx:.2f}" y2="{ny:.2f}"
+              stroke="rgba(17,24,39,0.95)" stroke-width="4" stroke-linecap="round" />
+        <circle cx="{cx:.2f}" cy="{cy:.2f}" r="7"
+                fill="rgba(17,24,39,0.95)" stroke="rgba(255,255,255,0.35)" stroke-width="2" />
+      </svg>
+    </div>
 
-      <line x1="{tx1:.2f}" y1="{ty1:.2f}" x2="{tx2:.2f}" y2="{ty2:.2f}"
-            stroke="rgba(255,255,255,0.85)" stroke-width="3" stroke-linecap="round" />
-
-      <line x1="{cx:.2f}" y1="{cy:.2f}" x2="{nx:.2f}" y2="{ny:.2f}"
-            stroke="rgba(17,24,39,0.95)" stroke-width="4" stroke-linecap="round" />
-      <circle cx="{cx:.2f}" cy="{cy:.2f}" r="7"
-              fill="rgba(17,24,39,0.95)" stroke="rgba(255,255,255,0.35)" stroke-width="2" />
-    </svg>
+    <div class="gauge-value">{(v*100):.2f}%</div>
+    <div class="gauge-sub">
+      <span>{subtitle_left}</span>
+      <span>{subtitle_right}</span>
+    </div>
   </div>
-
-  <div class="gauge-value">{(v*100):.2f}%</div>
-  <div class="gauge-sub">
-    <span>{subtitle_left}</span>
-    <span>{subtitle_right}</span>
-  </div>
-</div>
+</body>
+</html>
 """
 
 
@@ -366,15 +413,17 @@ if dark_mode:
     BORDER = "rgba(167, 139, 250, 0.22)"
     TXT = "#f8fafc"
     MUTED = "rgba(248,250,252,.75)"
+    WIDGET_TEXT = "#f8fafc"            # dark mode => white text
+    DROPDOWN_BG = "rgba(17, 24, 39, 0.98)"
 else:
     PAGE_BG = "linear-gradient(180deg, #f7f2ff 0%, #f7f2ff 45%, #efe6ff 100%)"
     CARD_BG = "rgba(255,255,255,0.84)"
     BORDER = "rgba(139, 92, 246, 0.20)"
     TXT = "#111827"
     MUTED = "rgba(17,24,39,.70)"
+    WIDGET_TEXT = "#111827"            # light mode => black text
+    DROPDOWN_BG = "rgba(255,255,255,0.98)"
 
-WIDGET_TEXT = "#f8fafc"
-DROPDOWN_BG = "rgba(17, 24, 39, 0.98)"
 
 st.markdown(
     f"""
@@ -402,6 +451,7 @@ st.markdown(
     color: {TXT} !important;
   }}
 
+  /* ===== LOGO ===== */
   .logo-wrap {{
     display:flex;
     justify-content:flex-end;
@@ -420,34 +470,39 @@ st.markdown(
   }}
   .logo-img {{ display:block; }}
 
-  /* Widget text always white */
+  /* ========= INPUTS & SELECTS (standardize dark/light) ========= */
   .stNumberInput input, .stTextInput input, .stTextArea textarea {{
     color: {WIDGET_TEXT} !important;
     -webkit-text-fill-color: {WIDGET_TEXT} !important;
+    caret-color: {WIDGET_TEXT} !important;
   }}
+
+  /* BaseWeb select: selected value + placeholder */
   [data-baseweb="select"] * {{
     color: {WIDGET_TEXT} !important;
     -webkit-text-fill-color: {WIDGET_TEXT} !important;
   }}
 
-  /* Dropdown menu open */
+  /* Dropdown menu open (options panel) */
   [data-baseweb="menu"], ul[role="listbox"] {{
     background: {DROPDOWN_BG} !important;
   }}
-  [data-baseweb="popover"] * {{
+  /* Ensure option text always visible in dropdown */
+  [data-baseweb="menu"] * , ul[role="listbox"] * {{
     color: {WIDGET_TEXT} !important;
     -webkit-text-fill-color: {WIDGET_TEXT} !important;
   }}
+
   li[role="option"]:hover {{
     background: rgba(167, 139, 250, 0.14) !important;
   }}
 
-  /* DataFrame text white */
+  /* DataFrame text */
   div[data-testid="stDataFrame"] * {{
     color: {WIDGET_TEXT} !important;
   }}
 
-  /* Buttons text white */
+  /* Buttons text */
   div.stButton > button,
   div.stDownloadButton > button {{
     color: #ffffff !important;
@@ -481,32 +536,6 @@ st.markdown(
     background: rgba(239,68,68,0.16);
     border-color: rgba(239,68,68,0.35);
   }}
-
-  /* Gauge card */
-  .gauge-card {{
-    border: 1px solid {BORDER};
-    background: rgba(255,255,255,0.06);
-    border-radius: 16px;
-    padding: 12px 12px;
-    margin: 10px 0;
-  }}
-  .gauge-title {{
-    font-weight: 800;
-    margin-bottom: 6px;
-    opacity: .95;
-  }}
-  .gauge-value {{
-    font-weight: 900;
-    font-size: 20px;
-    margin-top: -4px;
-  }}
-  .gauge-sub {{
-    display:flex;
-    justify-content: space-between;
-    font-size: 12px;
-    opacity: .82;
-    margin-top: 2px;
-  }}
 </style>
 """,
     unsafe_allow_html=True,
@@ -538,8 +567,10 @@ with left:
         job = st.selectbox("Occupation", OPTIONS["Occupation"], index=0, help="Your current jobs.")
         household = st.selectbox("Household Size", OPTIONS["Household Size"], index=0, help="Number of people living together.")
         dependents = st.selectbox("Number of Dependents", OPTIONS["Number of Dependents"], index=0, help="Number of dependents you support.")
+
         rental_label = st.selectbox("Type of Rental Housing", OPTIONS["Type of Rental Housing (labels)"], index=0, help="Type of house you rent.")
         rental_code = OPTIONS["Type of Rental Housing (codes)"][OPTIONS["Type of Rental Housing (labels)"].index(rental_label)]
+
         furnished = st.selectbox("Furnished Type", OPTIONS["Furnished Type"], index=0, help="Whether the house is furnished.")
         deposit = st.selectbox("Deposit", OPTIONS["Deposit"], index=0, help="Your deposit arrangement.")
         years = st.selectbox("Total years renting", OPTIONS["Total years renting"], index=0, help="How long you have been renting.")
@@ -641,7 +672,7 @@ with right:
             unsafe_allow_html=True,
         )
 
-        # ===== meters (render with components.html to prevent raw svg showing as text) =====
+        # ===== meters (text color now follows theme) =====
         g1, g2 = st.columns(2)
 
         with g1:
@@ -652,6 +683,8 @@ with right:
                     threshold_0_1=float(P_THRESHOLD),
                     subtitle_left="Low",
                     subtitle_right=f"Pass at {P_THRESHOLD:.2f}",
+                    text_color=TXT,
+                    border_color=BORDER,
                 ),
                 height=265,
                 scrolling=False,
@@ -668,6 +701,8 @@ with right:
                     threshold_0_1=1.0,
                     subtitle_left=f"Rent/Income: {share:.2f}",
                     subtitle_right=f"Threshold: {ratio_v:.2f}",
+                    text_color=TXT,
+                    border_color=BORDER,
                 ),
                 height=265,
                 scrolling=False,
