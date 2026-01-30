@@ -166,10 +166,7 @@ def svg_gauge_html(
     border_color: str,
 ) -> str:
     """
-    Meter in inline SVG (wrapped in its own HTML so it renders consistently).
-    Fixes:
-    - No raw SVG/code showing
-    - Text color follows Dark/Light mode
+    Meter in inline SVG (iframe-safe) + not cut off.
     """
     v = clamp(value_0_1, 0.0, 1.0)
     t = clamp(threshold_0_1, 0.0, 1.0)
@@ -204,7 +201,6 @@ def svg_gauge_html(
             f'stroke="{col}" stroke-width="16" fill="none" stroke-linecap="round" />'
         )
 
-    # IMPORTANT: components.html runs in an iframe. We set body background transparent and force text color.
     return f"""
 <!doctype html>
 <html>
@@ -217,12 +213,14 @@ def svg_gauge_html(
     background: transparent;
     color: {text_color};
     font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    overflow: hidden;
   }}
   .gauge-card {{
     border: 1px solid {border_color};
     background: rgba(255,255,255,0.06);
     border-radius: 16px;
-    padding: 12px 12px;
+    padding: 12px 12px 14px 12px; /* extra bottom padding so text never clipped */
+    box-sizing: border-box;
   }}
   .gauge-title {{
     font-weight: 800;
@@ -413,7 +411,12 @@ if dark_mode:
     BORDER = "rgba(167, 139, 250, 0.22)"
     TXT = "#f8fafc"
     MUTED = "rgba(248,250,252,.75)"
-    WIDGET_TEXT = "#f8fafc"            # dark mode => white text
+
+    # input/select look in dark mode
+    INPUT_BG = "rgba(17, 24, 39, 0.92)"
+    INPUT_BORDER = "rgba(167, 139, 250, 0.22)"
+    INPUT_TEXT = "#f8fafc"
+
     DROPDOWN_BG = "rgba(17, 24, 39, 0.98)"
 else:
     PAGE_BG = "linear-gradient(180deg, #f7f2ff 0%, #f7f2ff 45%, #efe6ff 100%)"
@@ -421,9 +424,13 @@ else:
     BORDER = "rgba(139, 92, 246, 0.20)"
     TXT = "#111827"
     MUTED = "rgba(17,24,39,.70)"
-    WIDGET_TEXT = "#111827"            # light mode => black text
-    DROPDOWN_BG = "rgba(255,255,255,0.98)"
 
+    # input/select look in light mode (as requested: white boxes)
+    INPUT_BG = "rgba(255,255,255,0.98)"
+    INPUT_BORDER = "rgba(139, 92, 246, 0.22)"
+    INPUT_TEXT = "#111827"
+
+    DROPDOWN_BG = "rgba(255,255,255,0.98)"
 
 st.markdown(
     f"""
@@ -472,25 +479,35 @@ st.markdown(
 
   /* ========= INPUTS & SELECTS (standardize dark/light) ========= */
   .stNumberInput input, .stTextInput input, .stTextArea textarea {{
-    color: {WIDGET_TEXT} !important;
-    -webkit-text-fill-color: {WIDGET_TEXT} !important;
-    caret-color: {WIDGET_TEXT} !important;
+    background: {INPUT_BG} !important;
+    border: 1px solid {INPUT_BORDER} !important;
+    color: {INPUT_TEXT} !important;
+    -webkit-text-fill-color: {INPUT_TEXT} !important;
+    caret-color: {INPUT_TEXT} !important;
+    border-radius: 12px !important;
   }}
 
-  /* BaseWeb select: selected value + placeholder */
+  /* BaseWeb select control (closed) */
+  [data-baseweb="select"] > div {{
+    background: {INPUT_BG} !important;
+    border: 1px solid {INPUT_BORDER} !important;
+    border-radius: 12px !important;
+  }}
+  /* Selected value, placeholder, and icons inside select */
   [data-baseweb="select"] * {{
-    color: {WIDGET_TEXT} !important;
-    -webkit-text-fill-color: {WIDGET_TEXT} !important;
+    color: {INPUT_TEXT} !important;
+    -webkit-text-fill-color: {INPUT_TEXT} !important;
   }}
 
   /* Dropdown menu open (options panel) */
   [data-baseweb="menu"], ul[role="listbox"] {{
     background: {DROPDOWN_BG} !important;
+    border: 1px solid {INPUT_BORDER} !important;
   }}
   /* Ensure option text always visible in dropdown */
   [data-baseweb="menu"] * , ul[role="listbox"] * {{
-    color: {WIDGET_TEXT} !important;
-    -webkit-text-fill-color: {WIDGET_TEXT} !important;
+    color: {INPUT_TEXT} !important;
+    -webkit-text-fill-color: {INPUT_TEXT} !important;
   }}
 
   li[role="option"]:hover {{
@@ -499,7 +516,7 @@ st.markdown(
 
   /* DataFrame text */
   div[data-testid="stDataFrame"] * {{
-    color: {WIDGET_TEXT} !important;
+    color: {INPUT_TEXT} !important;
   }}
 
   /* Buttons text */
@@ -672,7 +689,7 @@ with right:
             unsafe_allow_html=True,
         )
 
-        # ===== meters (text color now follows theme) =====
+        # ===== meters (increase iframe height so % + labels never cut) =====
         g1, g2 = st.columns(2)
 
         with g1:
@@ -686,7 +703,7 @@ with right:
                     text_color=TXT,
                     border_color=BORDER,
                 ),
-                height=265,
+                height=310,  # FIX: was 265 (cut off on some screens)
                 scrolling=False,
             )
 
@@ -704,7 +721,7 @@ with right:
                     text_color=TXT,
                     border_color=BORDER,
                 ),
-                height=265,
+                height=310,  # FIX: was 265 (cut off on some screens)
                 scrolling=False,
             )
 
