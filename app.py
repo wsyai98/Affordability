@@ -43,55 +43,41 @@ st.set_page_config(page_title="Rental Affordability Checker", layout="wide")
 # -------------------- COEFFICIENTS (UPDATED: COLUMN B) --------------------
 COEF = {
     "Umur": 0.002,
-    "Jantina ketua keluarga(1)": 0.007,  # Woman(1)
-    "Warganegara(1)": -0.818,            # Non-Malaysian(1)
-
+    "Jantina ketua keluarga(1)": 0.007,
+    "Warganegara(1)": -0.818,
     "Bangsa=Cina(1)": -0.411,
     "Bangsa=India(1)": 0.463,
     "Bangsa=Lain-lain(1)": 0.849,
-
     "Agama=Buddha(1)": 0.131,
     "Agama=Hindu(1)": -0.525,
     "Agama=Lain-lain(1)": -0.158,
-
     "Status Perkahwinan=Berkahwin(1)": -0.007,
     "Status Perkahwinan=Cerai/BaluDuda/Pisah(1)": 0.313,
-
     "Tahap Pendidikan=Undergraduate(1)": -0.537,
     "Tahap Pendidikan=Postgraduate(1)": -0.808,
-
     "Pekerjaan=Bekerja sendiri(1)": 0.198,
     "Pekerjaan=Lain-lain(1)": -0.801,
     "Pekerjaan=Pekerja Kerajaan(1)": 0.803,
     "Pekerjaan=Pekerja Swasta(1)": 0.912,
     "Pekerjaan=Pesara(1)": 0.018,
-
     "Bilangan isi rumah=3-4 orang(1)": 0.096,
     "Bilangan isi rumah=5+ orang(1)": -0.403,
-
     "Bilangan tanggungan=3-4 orang(1)": -0.028,
     "Bilangan tanggungan=5+ orang(1)": -0.134,
-
     "Jenis Penyewaan=Bilik(1)": 1.121,
-
     "Jenis rumah sewa=Kondominium(1)": -1.007,
     "Jenis rumah sewa=Lain-lain(1)": -0.598,
     "Jenis rumah sewa=Pangsapuri(1)": -0.604,
     "Jenis rumah sewa=Rumah 1 unit(1)": -0.711,
     "Jenis rumah sewa=Rumah Teres(1)": 0.526,
-
     "Jenis kelengkapan perabot=Berperabot penuh(1)": -0.053,
     "Jenis kelengkapan perabot=Berperabot separa(1)": -0.370,
-
     "deposit_1_1(1)": 0.339,
     "deposit_2_1(1)": 0.556,
     "deposit_3_1(1)": 0.686,
-
     "Berapa lama anda telah menyewa rumah=3-5 tahun(1)": 0.413,
     "Berapa lama anda telah menyewa rumah=6+ tahun(1)": -0.584,
-
     "Adakah anda mengetahui terdapat skim mampu sewa di Malaysia? (contoh: SMART sewa)(1)": 0.200,
-
     "Constant": 0.310,
 }
 
@@ -160,54 +146,74 @@ def clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, x))
 
 
-def gauge_html(title: str, value_0_1: float, threshold_0_1: float, subtitle_left: str, subtitle_right: str) -> str:
+def svg_gauge_html(title: str, value_0_1: float, threshold_0_1: float, subtitle_left: str, subtitle_right: str) -> str:
     """
-    Semicircle gauge (like your screenshot).
-    - value_0_1 in [0,1]
-    - threshold marker shown as a thin tick.
+    Robust semicircle meter using inline SVG (fixes the 'meter not appear' issue).
     """
     v = clamp(value_0_1, 0.0, 1.0)
     t = clamp(threshold_0_1, 0.0, 1.0)
 
-    # Needle rotation: -90deg (left) to +90deg (right)
-    needle_deg = -90 + (v * 180.0)
-    tick_deg = -90 + (t * 180.0)
+    # geometry
+    W, H = 260, 150
+    cx, cy = W / 2, 130
+    r = 95
 
-    # For nicer banding when threshold is small, we keep a sensible zone split:
-    # red: 0-0.10, yellow: 0.10-0.40, green: 0.40-1.00 (visual only)
-    # (Threshold marker still shows exact pass line.)
-    red_end = 0.10
-    yellow_end = 0.40
-    red_pct = red_end * 100
-    yel_pct = yellow_end * 100
+    # angles (degrees): -180 (left) to 0 (right) for semicircle
+    def angle_deg(p):
+        return -180 + (p * 180.0)
+
+    def polar_to_xy(deg):
+        rad = math.radians(deg)
+        x = cx + r * math.cos(rad)
+        y = cy + r * math.sin(rad)
+        return x, y
+
+    def arc_path(a0, a1):
+        x0, y0 = polar_to_xy(a0)
+        x1, y1 = polar_to_xy(a1)
+        large = 1 if (a1 - a0) > 180 else 0
+        return f"M {x0:.2f} {y0:.2f} A {r} {r} 0 {large} 1 {x1:.2f} {y1:.2f}"
+
+    # segments (visual)
+    segs = [
+        (0.0, 0.10, "rgba(239,68,68,0.85)"),
+        (0.10, 0.40, "rgba(245,158,11,0.85)"),
+        (0.40, 1.00, "rgba(34,197,94,0.85)"),
+    ]
+
+    # needle
+    nd = angle_deg(v)
+    nx, ny = polar_to_xy(nd)
+    tx = cx + (r - 8) * math.cos(math.radians(nd))
+    ty = cy + (r - 8) * math.sin(math.radians(nd))
+
+    # threshold tick
+    td = angle_deg(t)
+    tx1 = cx + (r - 2) * math.cos(math.radians(td))
+    ty1 = cy + (r - 2) * math.sin(math.radians(td))
+    tx2 = cx + (r - 22) * math.cos(math.radians(td))
+    ty2 = cy + (r - 22) * math.sin(math.radians(td))
 
     return f"""
 <div class="gauge-card">
   <div class="gauge-title">{title}</div>
 
-  <div class="gauge-wrap">
-    <div class="gauge-arc"
-      style="background:
-        conic-gradient(
-          rgba(239,68,68,0.85) 0% {red_pct}%,
-          rgba(245,158,11,0.85) {red_pct}% {yel_pct}%,
-          rgba(34,197,94,0.85) {yel_pct}% 100%
-        );">
-      <div class="gauge-cutout"></div>
+  <svg width="{W}" height="{H}" viewBox="0 0 {W} {H}">
+    <!-- arc segments -->
+    {''.join([f'<path d="{arc_path(angle_deg(a0), angle_deg(a1))}" stroke="{col}" stroke-width="16" fill="none" stroke-linecap="round"/>' for a0,a1,col in segs])}
 
-      <!-- threshold tick -->
-      <div class="gauge-tick" style="transform: rotate({tick_deg}deg);"></div>
+    <!-- threshold tick -->
+    <line x1="{tx1:.2f}" y1="{ty1:.2f}" x2="{tx2:.2f}" y2="{ty2:.2f}" stroke="rgba(255,255,255,0.85)" stroke-width="3" />
 
-      <!-- needle -->
-      <div class="gauge-needle" style="transform: rotate({needle_deg}deg);"></div>
-      <div class="gauge-dot"></div>
-    </div>
+    <!-- needle -->
+    <line x1="{cx:.2f}" y1="{cy:.2f}" x2="{tx:.2f}" y2="{ty:.2f}" stroke="rgba(17,24,39,0.95)" stroke-width="4" stroke-linecap="round" />
+    <circle cx="{cx:.2f}" cy="{cy:.2f}" r="7" fill="rgba(17,24,39,0.95)" stroke="rgba(255,255,255,0.35)" stroke-width="2" />
+  </svg>
 
-    <div class="gauge-value">{(v*100):.2f}%</div>
-    <div class="gauge-sub">
-      <span>{subtitle_left}</span>
-      <span>{subtitle_right}</span>
-    </div>
+  <div class="gauge-value">{(v*100):.2f}%</div>
+  <div class="gauge-sub">
+    <span>{subtitle_left}</span>
+    <span>{subtitle_right}</span>
   </div>
 </div>
 """
@@ -311,7 +317,6 @@ def build_inputs(
         inp["Berapa lama anda telah menyewa rumah=6+ tahun(1)"] = 1.0
 
     inp["Adakah anda mengetahui terdapat skim mampu sewa di Malaysia? (contoh: SMART sewa)(1)"] = 1.0 if smart_idx == 1 else 0.0
-
     return inp
 
 
@@ -390,7 +395,6 @@ st.markdown(
     color: {TXT} !important;
   }}
 
-  /* ===== LOGO: ngam ngam, no long grey bar ===== */
   .logo-wrap {{
     display:flex;
     justify-content:flex-end;
@@ -471,7 +475,7 @@ st.markdown(
     border-color: rgba(239,68,68,0.35);
   }}
 
-  /* Gauge (semicircle) */
+  /* Gauge card */
   .gauge-card {{
     border: 1px solid {BORDER};
     background: rgba(255,255,255,0.06);
@@ -481,86 +485,20 @@ st.markdown(
   }}
   .gauge-title {{
     font-weight: 800;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     opacity: .95;
   }}
-  .gauge-wrap {{
-    display:flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-  }}
-  .gauge-arc {{
-    width: 240px;
-    height: 120px;
-    border-radius: 240px 240px 0 0;
-    position: relative;
-    overflow: hidden;
-    border: 1px solid {BORDER};
-  }}
-  .gauge-cutout {{
-    position:absolute;
-    left: 16px;
-    right: 16px;
-    bottom: -1px;
-    height: 96px;
-    border-radius: 180px 180px 0 0;
-    background: {CARD_BG};
-    border-top: 1px solid rgba(255,255,255,0.10);
-  }}
-
-  .gauge-needle {{
-    position:absolute;
-    width: 4px;
-    height: 98px;
-    left: 50%;
-    bottom: 0px;
-    transform-origin: 50% 100%;
-    background: rgba(17,24,39,0.98);
-    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
-    border-radius: 8px;
-  }}
-  .gauge-dot {{
-    position:absolute;
-    width: 14px;
-    height: 14px;
-    border-radius: 999px;
-    background: rgba(17,24,39,0.98);
-    left: calc(50% - 7px);
-    bottom: 4px;
-    border: 2px solid rgba(255,255,255,0.35);
-  }}
-
-  /* thin tick marker for threshold */
-  .gauge-tick {{
-    position:absolute;
-    width: 2px;
-    height: 108px;
-    left: 50%;
-    bottom: 0px;
-    transform-origin: 50% 100%;
-    background: rgba(255,255,255,0.75);
-    opacity: .9;
-  }}
-
   .gauge-value {{
     font-weight: 900;
     font-size: 20px;
+    margin-top: -4px;
   }}
   .gauge-sub {{
-    width: 100%;
-    max-width: 260px;
     display:flex;
     justify-content: space-between;
     font-size: 12px;
     opacity: .82;
-  }}
-
-  /* Simple helper text under inputs */
-  .mini-help {{
-    font-size: 12px;
-    opacity: .80;
-    margin-top: -6px;
+    margin-top: 2px;
   }}
 </style>
 """,
@@ -581,63 +519,41 @@ with left:
 
     colA, colB = st.columns(2)
     with colA:
-        age = st.number_input("Age (years)", min_value=15, max_value=100, value=38, step=1)
-        st.markdown('<div class="mini-help">Your age (years).</div>', unsafe_allow_html=True)
-
-        gender = st.selectbox("Gender", OPTIONS["Gender"], index=0)
-        st.markdown('<div class="mini-help">Your gender.</div>', unsafe_allow_html=True)
-
-        nationality = st.selectbox("Nationality", OPTIONS["Nationality"], index=0)
-        st.markdown('<div class="mini-help">Your nationality status.</div>', unsafe_allow_html=True)
-
-        ethnicity = st.selectbox("Ethnicity", OPTIONS["Ethnicity"], index=0)
-        st.markdown('<div class="mini-help">Your ethnic background.</div>', unsafe_allow_html=True)
-
-        religion = st.selectbox("Religion", OPTIONS["Religion"], index=0)
-        st.markdown('<div class="mini-help">Your religion.</div>', unsafe_allow_html=True)
-
-        marital = st.selectbox("Marital Status", OPTIONS["Marital Status"], index=0)
-        st.markdown('<div class="mini-help">Your current marital status.</div>', unsafe_allow_html=True)
-
-        edu = st.selectbox("Education Level", OPTIONS["Education Level"], index=0)
-        st.markdown('<div class="mini-help">Your highest education level.</div>', unsafe_allow_html=True)
+        age = st.number_input("Age (years)", min_value=15, max_value=100, value=38, step=1, help="Your age (years).")
+        gender = st.selectbox("Gender", OPTIONS["Gender"], index=0, help="Your gender.")
+        nationality = st.selectbox("Nationality", OPTIONS["Nationality"], index=0, help="Your nationality status.")
+        ethnicity = st.selectbox("Ethnicity", OPTIONS["Ethnicity"], index=0, help="Your ethnic background.")
+        religion = st.selectbox("Religion", OPTIONS["Religion"], index=0, help="Your religion.")
+        marital = st.selectbox("Marital Status", OPTIONS["Marital Status"], index=0, help="Your current marital status.")
+        edu = st.selectbox("Education Level", OPTIONS["Education Level"], index=0, help="Your highest education level.")
 
     with colB:
-        job = st.selectbox("Occupation", OPTIONS["Occupation"], index=0)
-        st.markdown('<div class="mini-help">Your current jobs.</div>', unsafe_allow_html=True)
-
-        household = st.selectbox("Household Size", OPTIONS["Household Size"], index=0)
-        st.markdown('<div class="mini-help">Number of people living together.</div>', unsafe_allow_html=True)
-
-        dependents = st.selectbox("Number of Dependents", OPTIONS["Number of Dependents"], index=0)
-        st.markdown('<div class="mini-help">Number of dependents you support.</div>', unsafe_allow_html=True)
-
-        rental_label = st.selectbox("Type of Rental Housing", OPTIONS["Type of Rental Housing (labels)"], index=0)
-        st.markdown('<div class="mini-help">Type of house you rent.</div>', unsafe_allow_html=True)
+        job = st.selectbox("Occupation", OPTIONS["Occupation"], index=0, help="Your current jobs.")
+        household = st.selectbox("Household Size", OPTIONS["Household Size"], index=0, help="Number of people living together.")
+        dependents = st.selectbox("Number of Dependents", OPTIONS["Number of Dependents"], index=0, help="Number of dependents you support.")
+        rental_label = st.selectbox("Type of Rental Housing", OPTIONS["Type of Rental Housing (labels)"], index=0, help="Type of house you rent.")
         rental_code = OPTIONS["Type of Rental Housing (codes)"][OPTIONS["Type of Rental Housing (labels)"].index(rental_label)]
-
-        furnished = st.selectbox("Furnished Type", OPTIONS["Furnished Type"], index=0)
-        st.markdown('<div class="mini-help">Whether the house is furnished.</div>', unsafe_allow_html=True)
-
-        deposit = st.selectbox("Deposit", OPTIONS["Deposit"], index=0)
-        st.markdown('<div class="mini-help">Your deposit arrangement.</div>', unsafe_allow_html=True)
-
-        years = st.selectbox("Total years renting", OPTIONS["Total years renting"], index=0)
-        st.markdown('<div class="mini-help">How long you have been renting.</div>', unsafe_allow_html=True)
-
-        smart = st.selectbox("Known SMART SEWA", OPTIONS["Known SMART SEWA"], index=0)
-        st.markdown('<div class="mini-help">Whether you know SMART SEWA scheme.</div>', unsafe_allow_html=True)
+        furnished = st.selectbox("Furnished Type", OPTIONS["Furnished Type"], index=0, help="Whether the house is furnished.")
+        deposit = st.selectbox("Deposit", OPTIONS["Deposit"], index=0, help="Your deposit arrangement.")
+        years = st.selectbox("Total years renting", OPTIONS["Total years renting"], index=0, help="How long you have been renting.")
+        smart = st.selectbox("Known SMART SEWA", OPTIONS["Known SMART SEWA"], index=0, help="Whether you know SMART SEWA scheme.")
 
     st.divider()
     st.subheader("Income & Rent Inputs")
-
     c1, c2, c3 = st.columns(3)
     with c1:
-        income = st.number_input("Monthly Income (RM)", min_value=0.0, value=6000.0, step=100.0)
+        income = st.number_input("Monthly Income (RM)", min_value=0.0, value=6000.0, step=100.0, help="Your total monthly income.")
     with c2:
-        rent = st.number_input("Monthly Rent (RM)", min_value=0.0, value=2000.0, step=50.0)
+        rent = st.number_input("Monthly Rent (RM)", min_value=0.0, value=2000.0, step=50.0, help="Your monthly rent payment.")
     with c3:
-        ratio = st.number_input("Rent ratio threshold", min_value=0.0, max_value=1.0, value=0.38, step=0.01)
+        ratio = st.number_input(
+            "Rent ratio threshold",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.38,
+            step=0.01,
+            help="Affordability ratio used in Condition B (example: 0.30 means rent should be ≤ 30% of income).",
+        )
 
     run = st.button("✅ Run Check", use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
@@ -667,7 +583,6 @@ if run:
 
     df, z, p = compute_table(inputs)
 
-    # ---- Condition A threshold changed to 0.05 ----
     ok_a = p >= P_THRESHOLD
     cond_a = "Afford" if ok_a else "Not Afford"
 
@@ -708,7 +623,7 @@ with right:
         st.info("Click **Run Check** to show results and the calculation table.")
         st.markdown("</div>", unsafe_allow_html=True)
     else:
-        # ===== keep the highlight summary like before =====
+        # ===== summary highlight (keep like before) =====
         st.markdown(
             f"""
 <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
@@ -720,12 +635,12 @@ with right:
             unsafe_allow_html=True,
         )
 
-        # ===== meters (like your screenshot) =====
+        # ===== meters (fixed) =====
         g1, g2 = st.columns(2)
 
         with g1:
             st.markdown(
-                gauge_html(
+                svg_gauge_html(
                     title="Condition A Meter (Probability p)",
                     value_0_1=float(res["p"]),
                     threshold_0_1=float(P_THRESHOLD),
@@ -736,16 +651,14 @@ with right:
             )
 
         with g2:
-            # show how close rent share is to threshold ratio
             ratio_v = float(res["ratio"])
             share = float(res["rent_share"])
             closeness = clamp(share / ratio_v, 0.0, 1.0) if ratio_v > 0 else 0.0
-
             st.markdown(
-                gauge_html(
+                svg_gauge_html(
                     title="Condition B Meter (Rent vs Threshold)",
                     value_0_1=float(closeness),
-                    threshold_0_1=1.0,  # pass line is at the end (<= threshold)
+                    threshold_0_1=1.0,
                     subtitle_left=f"Rent/Income: {share:.2f}",
                     subtitle_right=f"Threshold: {ratio_v:.2f}",
                 ),
