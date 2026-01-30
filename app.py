@@ -412,6 +412,7 @@ if dark_mode:
     INPUT_BORDER = "rgba(167, 139, 250, 0.22)"
     INPUT_TEXT = "#f8fafc"
 
+    # ✅ FIX: dropdown list must be DARK in dark mode
     DROPDOWN_BG = "rgba(17, 24, 39, 0.98)"
     DROPDOWN_TEXT = "#f8fafc"
 else:
@@ -420,16 +421,14 @@ else:
     BORDER = "rgba(139, 92, 246, 0.20)"
     TXT = "#111827"
 
-    INPUT_BG = "rgba(255,255,255,0.98)"   # white boxes (as requested)
+    # ✅ requested: white boxes in light mode
+    INPUT_BG = "rgba(255,255,255,0.98)"
     INPUT_BORDER = "rgba(139, 92, 246, 0.22)"
     INPUT_TEXT = "#111827"
 
-    # FIX for your screenshot: when opening dropdown in LIGHT mode,
-    # some devices show white/bright background but text becomes too light (buta).
-    # So we force dropdown menu + option text to BLACK in light mode.
+    # ✅ dropdown list WHITE + text BLACK in light mode
     DROPDOWN_BG = "rgba(255,255,255,0.98)"
     DROPDOWN_TEXT = "#111827"
-
 
 st.markdown(
     f"""
@@ -458,10 +457,7 @@ st.markdown(
   }}
 
   /* ===== LOGO ===== */
-  .logo-wrap {{
-    display:flex;
-    justify-content:flex-end;
-  }}
+  .logo-wrap {{ display:flex; justify-content:flex-end; }}
   .logo-strip {{
     display:inline-flex;
     align-items:center;
@@ -506,6 +502,19 @@ st.markdown(
     color: {DROPDOWN_TEXT} !important;
     -webkit-text-fill-color: {DROPDOWN_TEXT} !important;
   }}
+
+  /* Extra force for BaseWeb option text (some devices override with opacity) */
+  li[role="option"] {{
+    color: {DROPDOWN_TEXT} !important;
+    -webkit-text-fill-color: {DROPDOWN_TEXT} !important;
+    opacity: 1 !important;
+  }}
+  li[role="option"] > div, li[role="option"] span {{
+    color: {DROPDOWN_TEXT} !important;
+    -webkit-text-fill-color: {DROPDOWN_TEXT} !important;
+    opacity: 1 !important;
+  }}
+
   li[role="option"]:hover {{
     background: rgba(167, 139, 250, 0.14) !important;
   }}
