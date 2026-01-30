@@ -412,7 +412,7 @@ if dark_mode:
     INPUT_BORDER = "rgba(167, 139, 250, 0.22)"
     INPUT_TEXT = "#f8fafc"
 
-    # ✅ DARK MODE: dropdown list BLACK (force)
+    # ✅ DARK MODE: DROPDOWN LIST MUST BE BLACK
     DROPDOWN_BG = "#0b0b14"
     DROPDOWN_TEXT = "#f8fafc"
     DROPDOWN_OPTION_HOVER = "rgba(167, 139, 250, 0.14)"
@@ -478,44 +478,60 @@ st.markdown(
     -webkit-text-fill-color: {INPUT_TEXT} !important;
   }}
 
-  /* ========= SELECT DROPDOWN (opened list) =========
-     Streamlit/BaseWeb sometimes renders the listbox in a portal.
-     So we style BOTH menu + listbox + their children, and also the "option" nodes.
-  */
-  [data-baseweb="popover"] [data-baseweb="menu"],
-  [data-baseweb="popover"] ul[role="listbox"],
+  /* ==========================================================
+     ✅ FINAL FIX (DARK MODE WHITE DROPDOWN BUG):
+     Streamlit/BaseWeb list can render inside a portal "dialog".
+     So we FORCE background/text on dialog + menu + listbox + options.
+     ========================================================== */
+
+  /* the portal container */
+  div[role="dialog"] {{
+    background: {DROPDOWN_BG} !important;
+  }}
+
+  /* menu/listbox containers */
+  div[role="dialog"] [data-baseweb="menu"],
+  div[role="dialog"] ul[role="listbox"],
   [data-baseweb="menu"],
   ul[role="listbox"] {{
     background: {DROPDOWN_BG} !important;
     border: 1px solid {INPUT_BORDER} !important;
   }}
 
-  [data-baseweb="popover"] [data-baseweb="menu"] *,
-  [data-baseweb="popover"] ul[role="listbox"] *,
+  /* EVERYTHING inside dropdown must follow text color */
+  div[role="dialog"] [data-baseweb="menu"] *,
+  div[role="dialog"] ul[role="listbox"] *,
   [data-baseweb="menu"] *,
   ul[role="listbox"] * {{
     color: {DROPDOWN_TEXT} !important;
     -webkit-text-fill-color: {DROPDOWN_TEXT} !important;
+    opacity: 1 !important;
   }}
 
+  /* options */
+  div[role="dialog"] li[role="option"],
   li[role="option"] {{
     background: transparent !important;
     color: {DROPDOWN_TEXT} !important;
     -webkit-text-fill-color: {DROPDOWN_TEXT} !important;
     opacity: 1 !important;
   }}
-  li[role="option"] > div, li[role="option"] span {{
+  div[role="dialog"] li[role="option"] > div,
+  div[role="dialog"] li[role="option"] span,
+  li[role="option"] > div,
+  li[role="option"] span {{
     color: {DROPDOWN_TEXT} !important;
     -webkit-text-fill-color: {DROPDOWN_TEXT} !important;
     opacity: 1 !important;
   }}
 
+  /* hover + selected */
+  div[role="dialog"] li[role="option"]:hover,
   li[role="option"]:hover {{
     background: {DROPDOWN_OPTION_HOVER} !important;
   }}
-
-  /* Also fix "selected value row" inside the dropdown list (some BaseWeb variants) */
-  [role="listbox"] [aria-selected="true"] {{
+  div[role="dialog"] [aria-selected="true"],
+  [aria-selected="true"] {{
     background: {DROPDOWN_OPTION_HOVER} !important;
   }}
 
