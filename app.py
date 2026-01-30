@@ -165,9 +165,6 @@ def svg_gauge_html(
     text_color: str,
     border_color: str,
 ) -> str:
-    """
-    Meter in inline SVG (iframe-safe) + not cut off.
-    """
     v = clamp(value_0_1, 0.0, 1.0)
     t = clamp(threshold_0_1, 0.0, 1.0)
 
@@ -219,7 +216,7 @@ def svg_gauge_html(
     border: 1px solid {border_color};
     background: rgba(255,255,255,0.06);
     border-radius: 16px;
-    padding: 12px 12px 14px 12px; /* extra bottom padding so text never clipped */
+    padding: 12px 12px 14px 12px;
     box-sizing: border-box;
   }}
   .gauge-title {{
@@ -410,27 +407,29 @@ if dark_mode:
     CARD_BG = "rgba(17, 24, 39, 0.68)"
     BORDER = "rgba(167, 139, 250, 0.22)"
     TXT = "#f8fafc"
-    MUTED = "rgba(248,250,252,.75)"
 
-    # input/select look in dark mode
     INPUT_BG = "rgba(17, 24, 39, 0.92)"
     INPUT_BORDER = "rgba(167, 139, 250, 0.22)"
     INPUT_TEXT = "#f8fafc"
 
     DROPDOWN_BG = "rgba(17, 24, 39, 0.98)"
+    DROPDOWN_TEXT = "#f8fafc"
 else:
     PAGE_BG = "linear-gradient(180deg, #f7f2ff 0%, #f7f2ff 45%, #efe6ff 100%)"
     CARD_BG = "rgba(255,255,255,0.84)"
     BORDER = "rgba(139, 92, 246, 0.20)"
     TXT = "#111827"
-    MUTED = "rgba(17,24,39,.70)"
 
-    # input/select look in light mode (as requested: white boxes)
-    INPUT_BG = "rgba(255,255,255,0.98)"
+    INPUT_BG = "rgba(255,255,255,0.98)"   # white boxes (as requested)
     INPUT_BORDER = "rgba(139, 92, 246, 0.22)"
     INPUT_TEXT = "#111827"
 
+    # FIX for your screenshot: when opening dropdown in LIGHT mode,
+    # some devices show white/bright background but text becomes too light (buta).
+    # So we force dropdown menu + option text to BLACK in light mode.
     DROPDOWN_BG = "rgba(255,255,255,0.98)"
+    DROPDOWN_TEXT = "#111827"
+
 
 st.markdown(
     f"""
@@ -477,7 +476,7 @@ st.markdown(
   }}
   .logo-img {{ display:block; }}
 
-  /* ========= INPUTS & SELECTS (standardize dark/light) ========= */
+  /* ========= INPUTS ========= */
   .stNumberInput input, .stTextInput input, .stTextArea textarea {{
     background: {INPUT_BG} !important;
     border: 1px solid {INPUT_BORDER} !important;
@@ -487,29 +486,26 @@ st.markdown(
     border-radius: 12px !important;
   }}
 
-  /* BaseWeb select control (closed) */
+  /* ========= SELECT (closed control) ========= */
   [data-baseweb="select"] > div {{
     background: {INPUT_BG} !important;
     border: 1px solid {INPUT_BORDER} !important;
     border-radius: 12px !important;
   }}
-  /* Selected value, placeholder, and icons inside select */
   [data-baseweb="select"] * {{
     color: {INPUT_TEXT} !important;
     -webkit-text-fill-color: {INPUT_TEXT} !important;
   }}
 
-  /* Dropdown menu open (options panel) */
+  /* ========= SELECT DROPDOWN (opened list) ========= */
   [data-baseweb="menu"], ul[role="listbox"] {{
     background: {DROPDOWN_BG} !important;
     border: 1px solid {INPUT_BORDER} !important;
   }}
-  /* Ensure option text always visible in dropdown */
   [data-baseweb="menu"] * , ul[role="listbox"] * {{
-    color: {INPUT_TEXT} !important;
-    -webkit-text-fill-color: {INPUT_TEXT} !important;
+    color: {DROPDOWN_TEXT} !important;
+    -webkit-text-fill-color: {DROPDOWN_TEXT} !important;
   }}
-
   li[role="option"]:hover {{
     background: rgba(167, 139, 250, 0.14) !important;
   }}
@@ -519,7 +515,7 @@ st.markdown(
     color: {INPUT_TEXT} !important;
   }}
 
-  /* Buttons text */
+  /* Buttons */
   div.stButton > button,
   div.stDownloadButton > button {{
     color: #ffffff !important;
@@ -639,14 +635,9 @@ if run:
     df, z, p = compute_table(inputs)
 
     ok_a = p >= P_THRESHOLD
-    cond_a = "Afford" if ok_a else "Not Afford"
-
     threshold = ratio * income
     ok_b = rent <= threshold
-    cond_b = "Afford" if ok_b else "Not Afford"
-
     ok_all = ok_a and ok_b
-    overall = "Afford" if ok_all else "Not Afford"
 
     rent_share = (rent / income) if income > 0 else 0.0
     rent_share = clamp(rent_share, 0.0, 1.0)
@@ -663,9 +654,6 @@ if run:
         "ok_a": ok_a,
         "ok_b": ok_b,
         "ok_all": ok_all,
-        "cond_a": cond_a,
-        "cond_b": cond_b,
-        "overall": overall,
     }
 
 res = st.session_state["result"]
@@ -689,7 +677,6 @@ with right:
             unsafe_allow_html=True,
         )
 
-        # ===== meters (increase iframe height so % + labels never cut) =====
         g1, g2 = st.columns(2)
 
         with g1:
@@ -703,7 +690,7 @@ with right:
                     text_color=TXT,
                     border_color=BORDER,
                 ),
-                height=310,  # FIX: was 265 (cut off on some screens)
+                height=310,
                 scrolling=False,
             )
 
@@ -721,7 +708,7 @@ with right:
                     text_color=TXT,
                     border_color=BORDER,
                 ),
-                height=310,  # FIX: was 265 (cut off on some screens)
+                height=310,
                 scrolling=False,
             )
 
