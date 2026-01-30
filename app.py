@@ -37,11 +37,11 @@ def logo_strip_html(paths, height_px=42, gap_px=10):
 
 st.set_page_config(page_title="Rental Affordability Checker", layout="wide")
 
-# -------------------- COEFFICIENTS (UPDATED TO MATCH YOUR PIC: COLUMN B) --------------------
+# -------------------- COEFFICIENTS (UPDATED: COLUMN B) --------------------
 COEF = {
     "Umur": 0.002,
-    "Jantina ketua keluarga(1)": 0.007,  # Perempuan(1)
-    "Warganegara(1)": -0.818,            # Non-Malaysian citizen(1)
+    "Jantina ketua keluarga(1)": 0.007,  # Woman(1)
+    "Warganegara(1)": -0.818,            # Non-Malaysian(1)
 
     "Bangsa=Cina(1)": -0.411,
     "Bangsa=India(1)": 0.463,
@@ -75,7 +75,7 @@ COEF = {
     "Jenis rumah sewa=Lain-lain(1)": -0.598,
     "Jenis rumah sewa=Pangsapuri(1)": -0.604,
     "Jenis rumah sewa=Rumah 1 unit(1)": -0.711,
-    "Jenis rumah sewa=Rumah Teres(1)": 0.526,  # 1 tingkat / 2 tingkat(1)
+    "Jenis rumah sewa=Rumah Teres(1)": 0.526,
 
     "Jenis kelengkapan perabot=Berperabot penuh(1)": -0.053,
     "Jenis kelengkapan perabot=Berperabot separa(1)": -0.370,
@@ -122,7 +122,6 @@ OPTIONS = {
     ],
     "Household Size": ["1 person", "2 people", "3–4 people", "5–6 people", "7 people or more"],
     "Number of Dependents": ["None", "1–2 people", "3–4 people", "5–6 people", "7 people or more"],
-    # House + Room removed (keep original codes)
     "Type of Rental Housing (labels)": [
         "Flat",
         "Apartment",
@@ -208,10 +207,10 @@ def build_inputs(
         inp["Status Perkahwinan=Cerai/BaluDuda/Pisah(1)"] = 1.0
 
     # Education base: SPM and below; dummies: Undergraduate, Postgraduate
-    # (No postgraduate option in your current UI, so it stays 0 unless you add it later.)
     edu_label = OPTIONS["Education Level"][edu_idx]
     if edu_label in ("Diploma", "Bachelor's Degree"):
         inp["Tahap Pendidikan=Undergraduate(1)"] = 1.0
+    # (No postgraduate option in current UI)
 
     # Occupation base: Unemployed; dummies per your pic
     job_label = OPTIONS["Occupation"][job_idx]
@@ -238,18 +237,7 @@ def build_inputs(
     elif dep_idx in (3, 4):
         inp["Bilangan tanggungan=5+ orang(1)"] = 1.0
 
-    # Jenis Penyewaan=Bilik(1) (no direct UI field here, keep 0.0 by default)
-
     # Type of Rental Housing -> Jenis rumah sewa dummies
-    # Use the label (already selected) through rental_code mapping outside.
-    # We'll infer by rental_code / label mapping with current options:
-    # Flat/Apartment -> Pangsapuri, Condominium -> Kondominium, Terrace -> Rumah Teres, One-unit -> Rumah 1 unit
-    # Lain-lain not present in UI -> stays 0.
-    # NOTE: rental_code values are [2..7] but we decide based on the label (more stable).
-    # We'll rebuild the label from rental_code by using the codes list:
-    # (You already computed rental_label earlier, so rental_code is consistent.)
-    # We'll map based on rental_code meaning via UI labels order:
-    # 2 Flat, 3 Apartment, 4 Condominium, 5 Terrace single, 6 Terrace double, 7 One-unit
     if rental_code == 4:
         inp["Jenis rumah sewa=Kondominium(1)"] = 1.0
     elif rental_code in (2, 3):
@@ -262,7 +250,6 @@ def build_inputs(
     # Furnished type -> perabot penuh (1) if Furnished
     if furnish_idx == 1:
         inp["Jenis kelengkapan perabot=Berperabot penuh(1)"] = 1.0
-    # Berperabot separa(1) not in UI -> stays 0.0
 
     # Deposit: only map 1+1, 2+1, 3+1 (no utility)
     dep_label = OPTIONS["Deposit"][deposit_idx]
@@ -279,8 +266,7 @@ def build_inputs(
     elif years_idx == 4:
         inp["Berapa lama anda telah menyewa rumah=6+ tahun(1)"] = 1.0
 
-    # SMART SEWA knowledge: in your output it is "Tidak(1)".
-    # OPTIONS["Known SMART SEWA"] = ["Yes", "No"], so idx==1 means "No".
+    # SMART SEWA knowledge: "No" -> (1)
     inp["Adakah anda mengetahui terdapat skim mampu sewa di Malaysia? (contoh: SMART sewa)(1)"] = 1.0 if smart_idx == 1 else 0.0
 
     return inp
@@ -295,6 +281,29 @@ def compute_table(inputs: dict):
     z = float(df["COEF×INPUT"].sum())
     p = float(logistic(z))
     return df, z, p
+
+
+def clamp(x: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, x))
+
+
+def meter_html(label: str, value_0_1: float, left_text: str, right_text: str) -> str:
+    v = clamp(value_0_1, 0.0, 1.0) * 100.0
+    return f"""
+<div style="margin:8px 0 12px 0;">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+    <div style="font-weight:600;">{label}</div>
+    <div style="opacity:.85;">{v:.1f}%</div>
+  </div>
+  <div class="meter-track">
+    <div class="meter-fill" style="width:{v:.2f}%;"></div>
+  </div>
+  <div style="display:flex; justify-content:space-between; font-size:12px; opacity:.8; margin-top:4px;">
+    <div>{left_text}</div>
+    <div>{right_text}</div>
+  </div>
+</div>
+"""
 
 
 # ======================== TOP BAR ========================
@@ -367,7 +376,7 @@ st.markdown(
     justify-content:flex-end;
   }}
   .logo-strip {{
-    display:inline-flex;          /* shrink to content */
+    display:inline-flex;
     align-items:center;
     flex-wrap: nowrap;
     padding: 2px 6px;
@@ -378,9 +387,7 @@ st.markdown(
     width: fit-content;
     max-width: 100%;
   }}
-  .logo-img {{
-    display:block;
-  }}
+  .logo-img {{ display:block; }}
 
   /* Widget text always white */
   .stNumberInput input, .stTextInput input, .stTextArea textarea {{
@@ -423,6 +430,51 @@ st.markdown(
     color: #ffffff !important;
     -webkit-text-fill-color: #ffffff !important;
   }}
+
+  /* Chips */
+  .chip {{
+    display:inline-flex;
+    align-items:center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 12px;
+    border: 1px solid {BORDER};
+    background: rgba(255,255,255,0.10);
+  }}
+  .chip.ok {{
+    background: rgba(34,197,94,0.18);
+    border-color: rgba(34,197,94,0.35);
+  }}
+  .chip.no {{
+    background: rgba(239,68,68,0.16);
+    border-color: rgba(239,68,68,0.35);
+  }}
+
+  /* Meter */
+  .meter-track {{
+    width: 100%;
+    height: 12px;
+    border-radius: 999px;
+    border: 1px solid {BORDER};
+    background: rgba(255,255,255,0.10);
+    overflow: hidden;
+    margin-top: 6px;
+  }}
+  .meter-fill {{
+    height: 100%;
+    border-radius: 999px;
+    background: rgba(167, 139, 250, 0.85);
+  }}
+
+  /* Subtle info box */
+  .hint-box {{
+    border: 1px dashed {BORDER};
+    background: rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 10px 12px;
+    margin-top: 10px;
+  }}
 </style>
 """,
     unsafe_allow_html=True,
@@ -440,38 +492,153 @@ with left:
     st.markdown('<div class="purple-card">', unsafe_allow_html=True)
     st.subheader("User Inputs")
 
+    with st.expander("ℹ️ Quick guide (what these inputs mean)", expanded=False):
+        st.markdown(
+            """
+- **Condition A (Logistic model)** uses the coefficients (COEF) + your inputs (INPUT) to compute **z** and **probability p**.
+- **Condition B (Rent-to-Income rule)** checks whether **Rent ≤ ratio × Income**.
+- **Overall** is **Afford** only if both conditions are satisfied.
+"""
+        )
+
     colA, colB = st.columns(2)
     with colA:
-        age = st.number_input("Age (years)", min_value=15, max_value=100, value=38, step=1)
-        gender = st.selectbox("Gender", OPTIONS["Gender"], index=0)
-        nationality = st.selectbox("Nationality", OPTIONS["Nationality"], index=0)
-        ethnicity = st.selectbox("Ethnicity", OPTIONS["Ethnicity"], index=0)
-        religion = st.selectbox("Religion", OPTIONS["Religion"], index=0)
-        marital = st.selectbox("Marital Status", OPTIONS["Marital Status"], index=0)
-        edu = st.selectbox("Education Level", OPTIONS["Education Level"], index=0)
+        age = st.number_input(
+            "Age (years)",
+            min_value=15,
+            max_value=100,
+            value=38,
+            step=1,
+            help="Used directly in the logistic model (Umur).",
+        )
+        gender = st.selectbox(
+            "Gender",
+            OPTIONS["Gender"],
+            index=0,
+            help="Model uses a dummy variable for Woman(1). Man is the baseline.",
+        )
+        nationality = st.selectbox(
+            "Nationality",
+            OPTIONS["Nationality"],
+            index=0,
+            help="Model uses a dummy variable for Non-Malaysian(1). Malaysian is the baseline.",
+        )
+        ethnicity = st.selectbox(
+            "Ethnicity",
+            OPTIONS["Ethnicity"],
+            index=0,
+            help="Malay is baseline; Chinese/Indian/Others are captured as dummies in the model.",
+        )
+        religion = st.selectbox(
+            "Religion",
+            OPTIONS["Religion"],
+            index=0,
+            help="Islam is baseline; Buddhism/Hinduism/Others are captured as dummies in the model.",
+        )
+        marital = st.selectbox(
+            "Marital Status",
+            OPTIONS["Marital Status"],
+            index=0,
+            help="Single is baseline; Married and (Widowed/Divorced/Separated) are grouped into model dummies.",
+        )
+        edu = st.selectbox(
+            "Education Level",
+            OPTIONS["Education Level"],
+            index=0,
+            help="Model has Undergraduate(1) and Postgraduate(1). Current UI maps Diploma/Bachelor → Undergraduate(1).",
+        )
 
     with colB:
-        job = st.selectbox("Occupation", OPTIONS["Occupation"], index=0)
-        household = st.selectbox("Household Size", OPTIONS["Household Size"], index=0)
-        dependents = st.selectbox("Number of Dependents", OPTIONS["Number of Dependents"], index=0)
+        job = st.selectbox(
+            "Occupation",
+            OPTIONS["Occupation"],
+            index=0,
+            help="Mapped to model dummies (self-employed / govt / private / retiree / others).",
+        )
+        household = st.selectbox(
+            "Household Size",
+            OPTIONS["Household Size"],
+            index=0,
+            help="Baseline is small household; model includes 3–4(1) and 5+(1).",
+        )
+        dependents = st.selectbox(
+            "Number of Dependents",
+            OPTIONS["Number of Dependents"],
+            index=0,
+            help="Baseline is none/low; model includes 3–4(1) and 5+(1).",
+        )
 
-        rental_label = st.selectbox("Type of Rental Housing", OPTIONS["Type of Rental Housing (labels)"], index=0)
+        rental_label = st.selectbox(
+            "Type of Rental Housing",
+            OPTIONS["Type of Rental Housing (labels)"],
+            index=0,
+            help="Mapped to model dummies (pangsapuri/condominium/teres/one-unit).",
+        )
         rental_code = OPTIONS["Type of Rental Housing (codes)"][OPTIONS["Type of Rental Housing (labels)"].index(rental_label)]
 
-        furnished = st.selectbox("Furnished Type", OPTIONS["Furnished Type"], index=0)
-        deposit = st.selectbox("Deposit", OPTIONS["Deposit"], index=0)
-        years = st.selectbox("Total years renting", OPTIONS["Total years renting"], index=0)
-        smart = st.selectbox("Known SMART SEWA", OPTIONS["Known SMART SEWA"], index=0)
+        furnished = st.selectbox(
+            "Furnished Type",
+            OPTIONS["Furnished Type"],
+            index=0,
+            help="Mapped to Berperabot penuh(1) if Furnished.",
+        )
+        deposit = st.selectbox(
+            "Deposit",
+            OPTIONS["Deposit"],
+            index=0,
+            help="Mapped to deposit_1_1(1) / deposit_2_1(1) / deposit_3_1(1). Others remain 0 in the model mapping.",
+        )
+        years = st.selectbox(
+            "Total years renting",
+            OPTIONS["Total years renting"],
+            index=0,
+            help="Model includes 3–5 years(1) and 6+ years(1).",
+        )
+        smart = st.selectbox(
+            "Known SMART SEWA",
+            OPTIONS["Known SMART SEWA"],
+            index=0,
+            help="Model uses No(1) dummy (Tidak(1)).",
+        )
 
     st.divider()
     st.subheader("Income & Rent Inputs")
+
+    with st.expander("ℹ️ Condition B explained", expanded=False):
+        st.markdown(
+            """
+Condition B is the **Rent-to-Income rule**:
+- Compute **threshold = ratio × Income**
+- If **Rent ≤ threshold**, then Condition B = **Afford**
+"""
+        )
+
     c1, c2, c3 = st.columns(3)
     with c1:
-        income = st.number_input("Monthly Income (RM)", min_value=0.0, value=6000.0, step=100.0)
+        income = st.number_input(
+            "Monthly Income (RM)",
+            min_value=0.0,
+            value=6000.0,
+            step=100.0,
+            help="Used in Condition B threshold = ratio × income.",
+        )
     with c2:
-        rent = st.number_input("Monthly Rent (RM)", min_value=0.0, value=2000.0, step=50.0)
+        rent = st.number_input(
+            "Monthly Rent (RM)",
+            min_value=0.0,
+            value=2000.0,
+            step=50.0,
+            help="Compared against threshold in Condition B.",
+        )
     with c3:
-        ratio = st.number_input("Rent ratio threshold", min_value=0.0, max_value=1.0, value=0.38, step=0.01)
+        ratio = st.number_input(
+            "Rent ratio threshold",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.38,
+            step=0.01,
+            help="Common affordability ratio. Example: 0.38 means rent should be ≤ 38% of income.",
+        )
 
     run = st.button("✅ Run Check", use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
@@ -511,6 +678,10 @@ if run:
     ok_all = ok_a and ok_b
     overall = "Afford" if ok_all else "Not Afford"
 
+    # helpful extra numbers for visualization
+    rent_share = (rent / income) if income > 0 else 0.0
+    rent_share = clamp(rent_share, 0.0, 1.0)
+
     st.session_state["result"] = {
         "df": df,
         "z": z,
@@ -519,6 +690,7 @@ if run:
         "ratio": ratio,
         "income": income,
         "rent": rent,
+        "rent_share": rent_share,
         "ok_a": ok_a,
         "ok_b": ok_b,
         "ok_all": ok_all,
@@ -537,6 +709,7 @@ with right:
         st.info("Click **Run Check** to show results and the calculation table.")
         st.markdown("</div>", unsafe_allow_html=True)
     else:
+        # ===== summary chips =====
         st.markdown(
             f"""
 <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
@@ -548,10 +721,62 @@ with right:
             unsafe_allow_html=True,
         )
 
+        # ===== Friendly visualization =====
+        # Logistic model probability meter
+        st.markdown(
+            meter_html(
+                label="Condition A Meter: Probability p",
+                value_0_1=float(res["p"]),
+                left_text="0.0 (low)",
+                right_text="1.0 (high) — pass at 0.5",
+            ),
+            unsafe_allow_html=True,
+        )
+
+        # Rent-to-income meter (rent share vs ratio)
+        share = float(res["rent_share"])
+        ratio_v = float(res["ratio"])
+        # normalize to ratio for display (how close to threshold). cap at 1 for the bar.
+        closeness = clamp(share / ratio_v, 0.0, 1.0) if ratio_v > 0 else 0.0
+        st.markdown(
+            meter_html(
+                label="Condition B Meter: Rent share vs threshold",
+                value_0_1=float(closeness),
+                left_text=f"Rent/Income = {share:.2f}",
+                right_text=f"Threshold = {ratio_v:.2f}",
+            ),
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            f"""
+<div class="hint-box">
+  <b>Quick interpretation</b><br/>
+  • Condition A uses the model: <span style="opacity:.85;">p = 1/(1+exp(-z))</span>. Your p is <b>{res["p"]:.3f}</b>.<br/>
+  • Condition B compares rent to a threshold: <span style="opacity:.85;">threshold = ratio × income</span> = <b>RM {res["threshold"]:.2f}</b>.<br/>
+  • Your rent share is <b>{(share*100):.1f}%</b> of income.
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+        # ===== metrics =====
         m1, m2, m3 = st.columns(3)
         m1.metric("SUM(COEF×INPUT)  (z)", f"{res['z']:.6f}")
         m2.metric("Probability p = 1/(1+exp(-z))", f"{res['p']:.9f}")
         m3.metric(f"{res['ratio']:.2f} × Income (RM)", f"{res['threshold']:.2f}")
+
+        # ===== explanation + table =====
+        with st.expander("📌 How the logistic model is computed (simple explanation)", expanded=False):
+            st.markdown(
+                """
+1) The app converts your selections into **INPUT** values (mostly 0/1 dummies).  
+2) It multiplies each input by its **COEF** to get **COEF×INPUT**.  
+3) It sums them to get **z**.  
+4) It converts **z** into a probability: **p = 1/(1+exp(-z))**.  
+5) Condition A passes if **p ≥ 0.5**.
+"""
+            )
 
         st.caption("Calculation table (COEF, INPUT, COEF×INPUT). z is exactly the sum of the COEF×INPUT column.")
         st.dataframe(res["df"], use_container_width=True, height=520)
