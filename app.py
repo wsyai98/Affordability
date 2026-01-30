@@ -365,11 +365,14 @@ def build_inputs(
     elif years_idx == 4:
         inp["Berapa lama anda telah menyewa rumah=6+ tahun(1)"] = 1.0
 
-    inp["Adakah anda mengetahui terdapat skim mampu sewa di Malaysia? (contoh: SMART sewa)(1)"] = 1.0 if smart_idx == 1 else 0.0
+    inp["Adakah anda mengetahui terdapat skim mampu sewa di Malaysia? (contoh: SMART sewa)(1)"] = (
+        1.0 if smart_idx == 1 else 0.0
+    )
     return inp
 
 
 def compute_table(inputs: dict):
+    # Keep compute internally for z and p (UI doesn't show table anymore)
     rows = []
     for var, coef in COEF.items():
         x = float(inputs.get(var, 0.0))
@@ -412,12 +415,6 @@ if dark_mode:
     INPUT_BORDER = "rgba(167, 139, 250, 0.22)"
     INPUT_TEXT = "#f8fafc"
 
-    # keep existing dropdown vars (closed control uses INPUT_BG/INPUT_TEXT)
-    DROPDOWN_BG = "#0b0b14"
-    DROPDOWN_TEXT = "#f8fafc"
-    DROPDOWN_OPTION_HOVER = "rgba(167, 139, 250, 0.14)"
-
-    # ✅ NEW: dropdown LIST (selection variables) white background + black font (DARK MODE only)
     MENU_BG = "#ffffff"
     MENU_TEXT = "#111827"
     MENU_HOVER = "rgba(139, 92, 246, 0.10)"
@@ -431,11 +428,6 @@ else:
     INPUT_BORDER = "rgba(139, 92, 246, 0.22)"
     INPUT_TEXT = "#111827"
 
-    DROPDOWN_BG = "#ffffff"
-    DROPDOWN_TEXT = "#111827"
-    DROPDOWN_OPTION_HOVER = "rgba(139, 92, 246, 0.12)"
-
-    # light mode (same as before)
     MENU_BG = "#ffffff"
     MENU_TEXT = "#111827"
     MENU_HOVER = "rgba(139, 92, 246, 0.12)"
@@ -487,17 +479,11 @@ st.markdown(
     -webkit-text-fill-color: {INPUT_TEXT} !important;
   }}
 
-  /* ==========================================================
-     ✅ DROPDOWN LIST (SELECTION VARIABLES ONLY):
-     Make the LIST white + font black (especially for DARK MODE)
-     ========================================================== */
-
-  /* the portal container */
+  /* ========= DROPDOWN LIST ========= */
   div[role="dialog"] {{
     background: {MENU_BG} !important;
   }}
 
-  /* menu/listbox containers */
   div[role="dialog"] [data-baseweb="menu"],
   div[role="dialog"] ul[role="listbox"],
   [data-baseweb="menu"],
@@ -509,7 +495,6 @@ st.markdown(
     border: 1px solid {INPUT_BORDER} !important;
   }}
 
-  /* EVERYTHING inside dropdown must follow MENU text color */
   div[role="dialog"] [data-baseweb="menu"] *,
   div[role="dialog"] ul[role="listbox"] *,
   [data-baseweb="menu"] *,
@@ -521,7 +506,6 @@ st.markdown(
     opacity: 1 !important;
   }}
 
-  /* options */
   div[role="dialog"] li[role="option"],
   li[role="option"] {{
     background: transparent !important;
@@ -529,16 +513,7 @@ st.markdown(
     -webkit-text-fill-color: {MENU_TEXT} !important;
     opacity: 1 !important;
   }}
-  div[role="dialog"] li[role="option"] > div,
-  div[role="dialog"] li[role="option"] span,
-  li[role="option"] > div,
-  li[role="option"] span {{
-    color: {MENU_TEXT} !important;
-    -webkit-text-fill-color: {MENU_TEXT} !important;
-    opacity: 1 !important;
-  }}
 
-  /* hover + selected */
   div[role="dialog"] li[role="option"]:hover,
   li[role="option"]:hover {{
     background: {MENU_HOVER} !important;
@@ -548,10 +523,7 @@ st.markdown(
     background: {MENU_HOVER} !important;
   }}
 
-  /* =========================
-     ✅ TOOLTIP / USER GUIDE (help=...)
-     (kekal ikut MENU bg/text supaya readable)
-     ========================= */
+  /* ========= TOOLTIP ========= */
   div[role="tooltip"] {{
     background: {MENU_BG} !important;
     color: {MENU_TEXT} !important;
@@ -563,11 +535,6 @@ st.markdown(
     color: {MENU_TEXT} !important;
     -webkit-text-fill-color: {MENU_TEXT} !important;
     opacity: 1 !important;
-  }}
-
-  /* DataFrame text */
-  div[data-testid="stDataFrame"] * {{
-    color: {INPUT_TEXT} !important;
   }}
 
   /* Buttons */
@@ -714,7 +681,6 @@ if run:
     rent_share = clamp(rent_share, 0.0, 1.0)
 
     st.session_state["result"] = {
-        "df": df,
         "z": z,
         "p": p,
         "threshold": threshold,
@@ -734,7 +700,7 @@ with right:
     st.subheader("Results")
 
     if res is None:
-        st.info("Click **Run Check** to show results and the calculation table.")
+        st.info("Click **Run Check** to show results.")
         st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.markdown(
@@ -784,28 +750,8 @@ with right:
             )
 
         m1, m2, m3 = st.columns(3)
-        m1.metric("SUM(COEF×INPUT)  (z)", f"{res['z']:.6f}")
-        m2.metric("Probability p = 1/(1+exp(-z))", f"{res['p']:.9f}")
-        m3.metric(f"{res['ratio']:.2f} × Income (RM)", f"{res['threshold']:.2f}")
+        m1.metric("Score (z)", f"{res['z']:.6f}")
+        m2.metric("Estimated probability (p)", f"{res['p']:.9f}")
+        m3.metric("Rent threshold (RM)", f"{res['threshold']:.2f}")
 
-        st.caption("Calculation table (COEF, INPUT, COEF×INPUT). z is exactly the sum of the COEF×INPUT column.")
-        st.dataframe(res["df"], use_container_width=True, height=520)
-
-        csv = res["df"].to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "⬇️ Download Calculation Table (CSV)",
-            data=csv,
-            file_name="affordability_calculation.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-
-        st.markdown(
-            f"""
-**Rules used**
-- Condition A: `IF( p >= {P_THRESHOLD:.2f} , "Afford" , "Not Afford")`
-- Condition B: `IF( Rent <= ratio×Income , "Afford" , "Not Afford")`
-- Overall: `IF( AND(ConditionA, ConditionB) , "Afford" , "Not Afford")`
-"""
-        )
         st.markdown("</div>", unsafe_allow_html=True)
