@@ -412,10 +412,15 @@ if dark_mode:
     INPUT_BORDER = "rgba(167, 139, 250, 0.22)"
     INPUT_TEXT = "#f8fafc"
 
-    # ✅ DARK MODE: DROPDOWN LIST MUST BE BLACK
+    # keep existing dropdown vars (closed control uses INPUT_BG/INPUT_TEXT)
     DROPDOWN_BG = "#0b0b14"
     DROPDOWN_TEXT = "#f8fafc"
     DROPDOWN_OPTION_HOVER = "rgba(167, 139, 250, 0.14)"
+
+    # ✅ NEW: dropdown LIST (selection variables) white background + black font (DARK MODE only)
+    MENU_BG = "#ffffff"
+    MENU_TEXT = "#111827"
+    MENU_HOVER = "rgba(139, 92, 246, 0.10)"
 else:
     PAGE_BG = "linear-gradient(180deg, #f7f2ff 0%, #f7f2ff 45%, #efe6ff 100%)"
     CARD_BG = "rgba(255,255,255,0.84)"
@@ -426,10 +431,14 @@ else:
     INPUT_BORDER = "rgba(139, 92, 246, 0.22)"
     INPUT_TEXT = "#111827"
 
-    # ✅ LIGHT MODE: dropdown WHITE + text BLACK
     DROPDOWN_BG = "#ffffff"
     DROPDOWN_TEXT = "#111827"
     DROPDOWN_OPTION_HOVER = "rgba(139, 92, 246, 0.12)"
+
+    # light mode (same as before)
+    MENU_BG = "#ffffff"
+    MENU_TEXT = "#111827"
+    MENU_HOVER = "rgba(139, 92, 246, 0.12)"
 
 st.markdown(
     f"""
@@ -479,31 +488,36 @@ st.markdown(
   }}
 
   /* ==========================================================
-     ✅ FINAL FIX (DARK MODE WHITE DROPDOWN BUG):
-     Force background/text for menu/listbox/options
+     ✅ DROPDOWN LIST (SELECTION VARIABLES ONLY):
+     Make the LIST white + font black (especially for DARK MODE)
      ========================================================== */
 
   /* the portal container */
   div[role="dialog"] {{
-    background: {DROPDOWN_BG} !important;
+    background: {MENU_BG} !important;
   }}
 
   /* menu/listbox containers */
   div[role="dialog"] [data-baseweb="menu"],
   div[role="dialog"] ul[role="listbox"],
   [data-baseweb="menu"],
-  ul[role="listbox"] {{
-    background: {DROPDOWN_BG} !important;
+  ul[role="listbox"],
+  [data-baseweb="popover"] > div,
+  div[role="listbox"],
+  div[role="dialog"] div[role="listbox"] {{
+    background: {MENU_BG} !important;
     border: 1px solid {INPUT_BORDER} !important;
   }}
 
-  /* EVERYTHING inside dropdown must follow text color */
+  /* EVERYTHING inside dropdown must follow MENU text color */
   div[role="dialog"] [data-baseweb="menu"] *,
   div[role="dialog"] ul[role="listbox"] *,
   [data-baseweb="menu"] *,
-  ul[role="listbox"] * {{
-    color: {DROPDOWN_TEXT} !important;
-    -webkit-text-fill-color: {DROPDOWN_TEXT} !important;
+  ul[role="listbox"] *,
+  div[role="listbox"] *,
+  div[role="dialog"] div[role="listbox"] * {{
+    color: {MENU_TEXT} !important;
+    -webkit-text-fill-color: {MENU_TEXT} !important;
     opacity: 1 !important;
   }}
 
@@ -511,74 +525,44 @@ st.markdown(
   div[role="dialog"] li[role="option"],
   li[role="option"] {{
     background: transparent !important;
-    color: {DROPDOWN_TEXT} !important;
-    -webkit-text-fill-color: {DROPDOWN_TEXT} !important;
+    color: {MENU_TEXT} !important;
+    -webkit-text-fill-color: {MENU_TEXT} !important;
     opacity: 1 !important;
   }}
   div[role="dialog"] li[role="option"] > div,
   div[role="dialog"] li[role="option"] span,
   li[role="option"] > div,
   li[role="option"] span {{
-    color: {DROPDOWN_TEXT} !important;
-    -webkit-text-fill-color: {DROPDOWN_TEXT} !important;
+    color: {MENU_TEXT} !important;
+    -webkit-text-fill-color: {MENU_TEXT} !important;
     opacity: 1 !important;
   }}
 
   /* hover + selected */
   div[role="dialog"] li[role="option"]:hover,
   li[role="option"]:hover {{
-    background: {DROPDOWN_OPTION_HOVER} !important;
+    background: {MENU_HOVER} !important;
   }}
   div[role="dialog"] [aria-selected="true"],
   [aria-selected="true"] {{
-    background: {DROPDOWN_OPTION_HOVER} !important;
-  }}
-
-  /* =========================
-     ✅ EXTRA FIX: BaseWeb popover/listbox variants
-     ========================= */
-  [data-baseweb="popover"] > div,
-  div[role="listbox"],
-  div[role="dialog"] div[role="listbox"] {{
-    background: {DROPDOWN_BG} !important;
-    border: 1px solid {INPUT_BORDER} !important;
-  }}
-  div[role="listbox"] *,
-  div[role="dialog"] div[role="listbox"] * {{
-    color: {DROPDOWN_TEXT} !important;
-    -webkit-text-fill-color: {DROPDOWN_TEXT} !important;
-    opacity: 1 !important;
+    background: {MENU_HOVER} !important;
   }}
 
   /* =========================
      ✅ TOOLTIP / USER GUIDE (help=...)
+     (kekal ikut MENU bg/text supaya readable)
      ========================= */
   div[role="tooltip"] {{
-    background: {DROPDOWN_BG} !important;
-    color: {DROPDOWN_TEXT} !important;
+    background: {MENU_BG} !important;
+    color: {MENU_TEXT} !important;
     border: 1px solid {INPUT_BORDER} !important;
     border-radius: 10px !important;
     box-shadow: 0 10px 25px rgba(0,0,0,0.25) !important;
   }}
   div[role="tooltip"] * {{
-    color: {DROPDOWN_TEXT} !important;
-    -webkit-text-fill-color: {DROPDOWN_TEXT} !important;
+    color: {MENU_TEXT} !important;
+    -webkit-text-fill-color: {MENU_TEXT} !important;
     opacity: 1 !important;
-  }}
-
-  /* =========================
-     ✅ REMOVE BLUE "INFO HEADER" LOOK:
-     Style Streamlit alert to match theme
-     ========================= */
-  div[data-testid="stAlert"] {{
-    background: rgba(17, 24, 39, 0.55) !important;
-    border: 1px solid {BORDER} !important;
-    border-radius: 12px !important;
-    color: {TXT} !important;
-  }}
-  div[data-testid="stAlert"] * {{
-    color: {TXT} !important;
-    -webkit-text-fill-color: {TXT} !important;
   }}
 
   /* DataFrame text */
