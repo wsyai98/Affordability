@@ -412,23 +412,24 @@ if dark_mode:
     INPUT_BORDER = "rgba(167, 139, 250, 0.22)"
     INPUT_TEXT = "#f8fafc"
 
-    # ✅ FIX: dropdown list must be DARK in dark mode
-    DROPDOWN_BG = "rgba(17, 24, 39, 0.98)"
+    # ✅ DARK MODE: dropdown list BLACK (force)
+    DROPDOWN_BG = "#0b0b14"
     DROPDOWN_TEXT = "#f8fafc"
+    DROPDOWN_OPTION_HOVER = "rgba(167, 139, 250, 0.14)"
 else:
     PAGE_BG = "linear-gradient(180deg, #f7f2ff 0%, #f7f2ff 45%, #efe6ff 100%)"
     CARD_BG = "rgba(255,255,255,0.84)"
     BORDER = "rgba(139, 92, 246, 0.20)"
     TXT = "#111827"
 
-    # ✅ requested: white boxes in light mode
     INPUT_BG = "rgba(255,255,255,0.98)"
     INPUT_BORDER = "rgba(139, 92, 246, 0.22)"
     INPUT_TEXT = "#111827"
 
-    # ✅ dropdown list WHITE + text BLACK in light mode
-    DROPDOWN_BG = "rgba(255,255,255,0.98)"
+    # ✅ LIGHT MODE: dropdown WHITE + text BLACK
+    DROPDOWN_BG = "#ffffff"
     DROPDOWN_TEXT = "#111827"
+    DROPDOWN_OPTION_HOVER = "rgba(139, 92, 246, 0.12)"
 
 st.markdown(
     f"""
@@ -456,22 +457,6 @@ st.markdown(
     color: {TXT} !important;
   }}
 
-  /* ===== LOGO ===== */
-  .logo-wrap {{ display:flex; justify-content:flex-end; }}
-  .logo-strip {{
-    display:inline-flex;
-    align-items:center;
-    flex-wrap: nowrap;
-    padding: 2px 6px;
-    border-radius: 12px;
-    border: 1px solid {BORDER};
-    background: rgba(255,255,255,0.55);
-    line-height: 0;
-    width: fit-content;
-    max-width: 100%;
-  }}
-  .logo-img {{ display:block; }}
-
   /* ========= INPUTS ========= */
   .stNumberInput input, .stTextInput input, .stTextArea textarea {{
     background: {INPUT_BG} !important;
@@ -493,18 +478,28 @@ st.markdown(
     -webkit-text-fill-color: {INPUT_TEXT} !important;
   }}
 
-  /* ========= SELECT DROPDOWN (opened list) ========= */
-  [data-baseweb="menu"], ul[role="listbox"] {{
+  /* ========= SELECT DROPDOWN (opened list) =========
+     Streamlit/BaseWeb sometimes renders the listbox in a portal.
+     So we style BOTH menu + listbox + their children, and also the "option" nodes.
+  */
+  [data-baseweb="popover"] [data-baseweb="menu"],
+  [data-baseweb="popover"] ul[role="listbox"],
+  [data-baseweb="menu"],
+  ul[role="listbox"] {{
     background: {DROPDOWN_BG} !important;
     border: 1px solid {INPUT_BORDER} !important;
   }}
-  [data-baseweb="menu"] * , ul[role="listbox"] * {{
+
+  [data-baseweb="popover"] [data-baseweb="menu"] *,
+  [data-baseweb="popover"] ul[role="listbox"] *,
+  [data-baseweb="menu"] *,
+  ul[role="listbox"] * {{
     color: {DROPDOWN_TEXT} !important;
     -webkit-text-fill-color: {DROPDOWN_TEXT} !important;
   }}
 
-  /* Extra force for BaseWeb option text (some devices override with opacity) */
   li[role="option"] {{
+    background: transparent !important;
     color: {DROPDOWN_TEXT} !important;
     -webkit-text-fill-color: {DROPDOWN_TEXT} !important;
     opacity: 1 !important;
@@ -516,7 +511,12 @@ st.markdown(
   }}
 
   li[role="option"]:hover {{
-    background: rgba(167, 139, 250, 0.14) !important;
+    background: {DROPDOWN_OPTION_HOVER} !important;
+  }}
+
+  /* Also fix "selected value row" inside the dropdown list (some BaseWeb variants) */
+  [role="listbox"] [aria-selected="true"] {{
+    background: {DROPDOWN_OPTION_HOVER} !important;
   }}
 
   /* DataFrame text */
@@ -558,6 +558,22 @@ st.markdown(
     background: rgba(239,68,68,0.16);
     border-color: rgba(239,68,68,0.35);
   }}
+
+  /* ===== LOGO ===== */
+  .logo-wrap {{ display:flex; justify-content:flex-end; }}
+  .logo-strip {{
+    display:inline-flex;
+    align-items:center;
+    flex-wrap: nowrap;
+    padding: 2px 6px;
+    border-radius: 12px;
+    border: 1px solid {BORDER};
+    background: rgba(255,255,255,0.55);
+    line-height: 0;
+    width: fit-content;
+    max-width: 100%;
+  }}
+  .logo-img {{ display:block; }}
 </style>
 """,
     unsafe_allow_html=True,
@@ -696,7 +712,7 @@ with right:
                     threshold_0_1=float(P_THRESHOLD),
                     subtitle_left="Low",
                     subtitle_right=f"Pass at {P_THRESHOLD:.2f}",
-                    text_color=TXT,
+                    text_color=("#f8fafc" if dark_mode else "#111827"),
                     border_color=BORDER,
                 ),
                 height=310,
@@ -714,7 +730,7 @@ with right:
                     threshold_0_1=1.0,
                     subtitle_left=f"Rent/Income: {share:.2f}",
                     subtitle_right=f"Threshold: {ratio_v:.2f}",
-                    text_color=TXT,
+                    text_color=("#f8fafc" if dark_mode else "#111827"),
                     border_color=BORDER,
                 ),
                 height=310,
