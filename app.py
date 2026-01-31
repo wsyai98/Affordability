@@ -6,6 +6,15 @@ from pathlib import Path
 import base64
 from datetime import datetime
 
+# ==========================================================
+# Rental Affordability Checker (English UI)
+# + Google Sheets logging (OWNER ONLY access via Service Account)
+# ==========================================================
+APP_DIR = Path(__file__).resolve().parent
+
+# ====== Condition A threshold (as requested) ======
+P_THRESHOLD = 0.05  # pass if p >= 0.05
+
 # Optional (Google Sheets). If not installed/configured, app still runs.
 try:
     import gspread
@@ -13,14 +22,6 @@ try:
 except Exception:
     gspread = None
     Credentials = None
-
-# ==========================================================
-# Rental Affordability Checker (English UI)
-# ==========================================================
-APP_DIR = Path(__file__).resolve().parent
-
-# ====== Condition A threshold (as requested) ======
-P_THRESHOLD = 0.05  # pass if p >= 0.05
 
 
 def img_to_base64(path: Path) -> str:
@@ -288,15 +289,31 @@ def compute_table(inputs: dict):
 
 
 # ===================== GOOGLE SHEETS (APPEND ROW) =====================
-def sheets_is_ready() -> bool:
+SHEET_ID_DEFAULT = "1sv9VlXO07K-wcmNCRVO5fvZcrzGcI4gncxfFVR73wxc"  # your sheet id
+
+
+def sheets_status():
+    """
+    Returns (ok: bool, msg: str)
+    """
     if gspread is None or Credentials is None:
-        return False
+        return (
+            False,
+            "Missing libraries. Install: pip install gspread google-auth",
+        )
+
+    # Secrets required (service account JSON goes into secrets)
     try:
-        _ = st.secrets["SHEET_ID"]
         _ = st.secrets["gcp_service_account"]
-        return True
     except Exception:
-        return False
+        return (
+            False,
+            "Missing Streamlit secret: [gcp_service_account].",
+        )
+
+    # Sheet ID can be provided via secrets, but we default to your given sheet id
+    # (still recommended to store in secrets).
+    return (True, "Google Sheets is ready.")
 
 
 def get_sheet():
@@ -309,52 +326,59 @@ def get_sheet():
         scopes=scopes,
     )
     client = gspread.authorize(creds)
-    sheet_id = st.secrets["SHEET_ID"]
+
+    sheet_id = st.secrets.get("SHEET_ID", SHEET_ID_DEFAULT)
     tab_name = st.secrets.get("SHEET_TAB", "Sheet1")
     return client.open_by_key(sheet_id).worksheet(tab_name)
 
 
-def append_to_sheet(payload: dict) -> None:
-    ws = get_sheet()
+SHEET_COLS = [
+    "timestamp",
+    "jantina",
+    "warganegara",
+    "bangsa",
+    "agama",
+    "status_perkahwinan",
+    "tahap_pendidikan",
+    "pekerjaan",
+    "bil_isi_rumah",
+    "bil_tanggungan",
+    "jenis_penyewaan",
+    "jenis_rumah_sewa",
+    "jenis_perabot",
+    "deposit",
+    "tempoh_menyewa",
+    "skim",
+    "income_rm",
+    "rent_rm",
+    "ratio_threshold",
+    "z",
+    "p",
+    "condition_a_ok",
+    "condition_b_ok",
+    "overall_ok",
+]
 
-    # Define columns (fixed order)
-    cols = [
-        "timestamp",
-        "jantina",
-        "warganegara",
-        "bangsa",
-        "agama",
-        "status_perkahwinan",
-        "tahap_pendidikan",
-        "pekerjaan",
-        "bil_isi_rumah",
-        "bil_tanggungan",
-        "jenis_penyewaan",
-        "jenis_rumah_sewa",
-        "jenis_perabot",
-        "deposit",
-        "tempoh_menyewa",
-        "skim",
-        "income_rm",
-        "rent_rm",
-        "ratio_threshold",
-        "z",
-        "p",
-        "condition_a_ok",
-        "condition_b_ok",
-        "overall_ok",
-    ]
 
-    # Ensure header exists (best effort)
+def ensure_header(ws):
     try:
-        existing = ws.row_values(1)
-        if not existing or existing[: len(cols)] != cols:
-            ws.insert_row(cols, 1)
+        first_row = ws.row_values(1)
+        if first_row != SHEET_COLS:
+            # If empty sheet, insert header at row 1
+            if not first_row:
+                ws.insert_row(SHEET_COLS, 1)
+            else:
+                # If something exists, put header as first row (keeps your data below)
+                ws.insert_row(SHEET_COLS, 1)
     except Exception:
-        # If header check fails, we still try append row below
+        # Don't block app if header check fails
         pass
 
-    row = [payload.get(c, "") for c in cols]
+
+def append_to_sheet(payload: dict) -> None:
+    ws = get_sheet()
+    ensure_header(ws)
+    row = [payload.get(c, "") for c in SHEET_COLS]
     ws.append_row(row, value_input_option="USER_ENTERED")
 
 
@@ -621,15 +645,22 @@ with left:
     st.subheader("Spreadsheet Logging (Google Sheets)")
     save_to_sheet = st.toggle("Save submission to spreadsheet", value=False)
 
+    ok_sheet, msg_sheet = sheets_status()
     if save_to_sheet:
-        if sheets_is_ready():
-            st.success("Google Sheets is ready (secrets detected).")
-            st.caption("Each Run will append 1 new row into your sheet.")
+        if ok_sheet:
+            st.success(msg_sheet)
+            st.caption(
+                "Note: users will NOT see your spreadsheet. Only the Service Account writes to it. "
+                "Make sure you shared the sheet to the Service Account email as Editor."
+            )
         else:
             st.warning(
-                "Google Sheets is NOT ready. "
-                "Make sure you installed `gspread` and added Streamlit Secrets: "
-                "`SHEET_ID` and `[gcp_service_account]`."
+                f"Google Sheets is NOT ready. {msg_sheet}\n\n"
+                "Checklist:\n"
+                "1) Install libs: `pip install gspread google-auth`\n"
+                "2) Put Service Account JSON into Streamlit Secrets as `[gcp_service_account]`\n"
+                "3) Share the Google Sheet to the service account email (Editor)\n"
+                "4) (Optional) Put `SHEET_ID` and `SHEET_TAB` in Secrets"
             )
 
     run = st.button("✅ Run Check", use_container_width=True)
@@ -650,6 +681,7 @@ if run:
         tempoh_label=tempoh_menyewa,
     )
 
+    # z and p are calculated by Streamlit (as you wanted)
     _df, z, p = compute_table(inputs)
 
     ok_a = p >= P_THRESHOLD
@@ -671,29 +703,12 @@ if run:
         "ok_a": ok_a,
         "ok_b": ok_b,
         "ok_all": ok_all,
-        # keep raw selections for logging
-        "raw": {
-            "jantina": jantina,
-            "warganegara": warganegara,
-            "bangsa": bangsa,
-            "agama": agama,
-            "status_perkahwinan": status_kahwin,
-            "tahap_pendidikan": tahap_pendidikan,
-            "pekerjaan": pekerjaan,
-            "bil_isi_rumah": bil_isi_rumah,
-            "bil_tanggungan": bil_tanggungan,
-            "jenis_penyewaan": jenis_penyewaan,
-            "jenis_rumah_sewa": jenis_rumah_sewa,
-            "jenis_perabot": jenis_perabot,
-            "deposit": deposit,
-            "tempoh_menyewa": tempoh_menyewa,
-            "skim": skim,
-        },
     }
 
-    # ===== append to Google Sheet if enabled =====
+    # ===== Append to Google Sheet if enabled =====
     if save_to_sheet:
-        if sheets_is_ready():
+        ok_sheet, _ = sheets_status()
+        if ok_sheet:
             payload = {
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "jantina": jantina,
@@ -724,7 +739,11 @@ if run:
                 append_to_sheet(payload)
                 st.toast("Saved to Google Sheets ✅", icon="✅")
             except Exception as e:
-                st.error(f"Failed to save to Google Sheets: {e}")
+                st.error(
+                    "Failed to save to Google Sheets.\n\n"
+                    f"Error: {e}\n\n"
+                    "Most common fix: share the sheet to the Service Account email as Editor."
+                )
         else:
             st.error("Google Sheets is not configured yet (missing secrets or libraries).")
 
@@ -790,3 +809,32 @@ with right:
         m3.metric("Rent threshold (RM)", f"{res['threshold']:.2f}")
 
         st.markdown("</div>", unsafe_allow_html=True)
+
+# ==========================================================
+# IMPORTANT SETUP NOTES (DO THIS ONCE)
+# ----------------------------------------------------------
+# 1) Install packages (local):
+#    pip install gspread google-auth
+#
+# 2) Create Service Account + enable Google Sheets API, then download JSON key.
+#
+# 3) Share your Google Sheet to service account email (Editor).
+#    Example email looks like: xxx@xxx.iam.gserviceaccount.com
+#
+# 4) Put secrets in Streamlit:
+#    - Local: .streamlit/secrets.toml
+#    - Streamlit Cloud: App settings -> Secrets
+#
+#    Example secrets.toml:
+#    SHEET_ID="1sv9VlXO07K-wcmNCRVO5fvZcrzGcI4gncxfFVR73wxc"
+#    SHEET_TAB="Sheet1"
+#
+#    [gcp_service_account]
+#    type="service_account"
+#    project_id="..."
+#    private_key_id="..."
+#    private_key="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+#    client_email="...@...iam.gserviceaccount.com"
+#    client_id="..."
+#    token_uri="https://oauth2.googleapis.com/token"
+# ==========================================================
