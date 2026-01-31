@@ -982,7 +982,6 @@ with left:
 
     st.divider()
     st.subheader("Spreadsheet Logging (Google Sheets)")
-    st.caption("EN: Optional logging to your private Google Sheet.  •  BM: Simpan rekod ke Google Sheet peribadi (pilihan).")
 
     save_to_sheet = st.toggle("Save submission to spreadsheet", value=False)
 
@@ -990,10 +989,6 @@ with left:
     if save_to_sheet:
         if ok_sheet:
             st.success(msg_sheet)
-            st.caption(
-                "EN: Users will NOT see your spreadsheet. Only the Service Account writes to it.\n"
-                "BM: Pengguna TIDAK akan nampak spreadsheet. Hanya Service Account yang menulis data."
-            )
         else:
             st.warning(
                 f"Google Sheets is NOT ready. {msg_sheet}\n\n"
