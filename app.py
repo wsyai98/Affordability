@@ -7,9 +7,21 @@ import base64
 from datetime import datetime
 
 # ==========================================================
-# Rental Affordability Checker (English UI)
+# Rental Affordability Checker (DWIBAHASA UI)
 # + Google Sheets logging (OWNER ONLY access via Service Account)
+# ----------------------------------------------------------
+# Condition A (Logistic model):
+#   z = SUM(COEF * INPUT)
+#   p = 1 / (1 + exp(-z))
+#   Pass if p >= P_THRESHOLD
+#
+# Condition B (Rent-to-Income rule):
+#   Pass if Rent <= ratio * Income
+#
+# Overall:
+#   Pass only if BOTH conditions pass
 # ==========================================================
+
 APP_DIR = Path(__file__).resolve().parent
 
 # ====== Condition A threshold (as requested) ======
@@ -24,6 +36,14 @@ except Exception:
     Credentials = None
 
 
+# ===================== SECURITY NOTE =====================
+# IMPORTANT: DO NOT put your service account JSON / private_key in this file or GitHub.
+# Put it in Streamlit Secrets only (local: .streamlit/secrets.toml, cloud: App -> Settings -> Secrets).
+# If you already pasted a private key anywhere public, revoke/rotate the key in Google Cloud immediately.
+# =========================================================
+
+
+# -------------------- LOGO HELPERS --------------------
 def img_to_base64(path: Path) -> str:
     data = path.read_bytes()
     return base64.b64encode(data).decode("utf-8")
@@ -32,6 +52,8 @@ def img_to_base64(path: Path) -> str:
 def logo_strip_html(paths, height_px=42, gap_px=10):
     imgs = []
     for p in paths:
+        if not p.exists():
+            continue
         b64 = img_to_base64(p)
         ext = p.suffix.lower().replace(".", "")
         mime = "png" if ext in ("png",) else "jpeg"
@@ -48,47 +70,7 @@ def logo_strip_html(paths, height_px=42, gap_px=10):
     """
 
 
-st.set_page_config(page_title="Rental Affordability Checker", layout="wide")
-
-# ===================== COEFFICIENTS (SIGNIFICANT ONLY: GREEN) =====================
-# Based on your SPSS "Variables in the Equation" (green Sig. values).
-# Keep Constant for the logistic equation.
-COEF = {
-    "Tahap Pendidikan=Undergraduate(1)": -0.537,
-    "Pekerjaan=Pekerja Kerajaan(1)": 0.803,
-    "Pekerjaan=Pekerja Swasta(1)": 0.912,
-    "Jenis Penyewaan=Bilik(1)": 1.121,
-    "Jenis rumah sewa=Kondominium(1)": -1.007,
-    "Jenis rumah sewa=Pangsapuri(1)": -0.604,
-    "Jenis rumah sewa=Rumah 1 unit(1)": -0.711,
-    "Jenis rumah sewa=Rumah Teres(1)": 0.526,
-    "Jenis kelengkapan perabot=Berperabot separa(1)": -0.370,
-    "deposit_2_1(1)": 0.556,
-    "Berapa lama anda telah menyewa rumah=3-5 tahun(1)": 0.413,
-    "Berapa lama anda telah menyewa rumah=6+ tahun(1)": -0.584,
-    "Constant": 0.310,
-}
-
-# ===================== OPTIONS (FOLLOW YOUR “LIST OF VARIABLES & CATEGORIES” PIC) =====================
-OPTIONS = {
-    "Jantina": ["Lelaki", "Perempuan"],
-    "Warganegara": ["Malaysian", "Non-Malaysian"],
-    "Bangsa": ["Bumiputera", "Cina", "India", "Lain-lain"],
-    "Agama": ["Islam", "Buddha", "Hindu", "Lain-lain"],
-    "Status Perkahwinan": ["Single", "Bercerai", "Berkahwin"],
-    "Tahap Pendidikan": ["SPM dan ke bawah", "Undergraduate", "Postgraduate"],
-    "Pekerjaan": ["Tidak bekerja", "Bekerja sendiri", "Lain-lain", "Pekerja Kerajaan", "Pekerja Swasta", "Pesara"],
-    "Bilangan Isi Rumah": ["Kurang dari 2 orang", "3 - 4 orang", "Lebih 5 orang"],
-    "Bilangan Tanggungan": ["Kurang dari 2 orang", "3 - 4 orang", "Lebih 5 orang"],
-    "Jenis Penyewaan": ["Rumah", "Bilik"],
-    "Jenis Rumah Sewa": ["Flat", "Condominium", "Lain-lain", "Pangsapuri", "Rumah 1 unit", "Rumah Teres"],
-    "Jenis Kelengkapan Perabot": ["Tiada perabot", "Perabot penuh", "Perabot separa"],
-    "Deposit": ["Tiada deposit", "1 + 1", "2 + 1", "3 + 1"],
-    "Tempoh Menyewa": ["Kurang 2 tahun", "3 - 5 tahun", "Lebih 6 tahun"],
-    "Skim": ["Ya", "Tidak"],
-}
-
-
+# -------------------- MODEL MATH --------------------
 def logistic(z: float) -> float:
     if z >= 0:
         ez = math.exp(-z)
@@ -223,6 +205,142 @@ def svg_gauge_html(
 """
 
 
+# ===================== COEFFICIENTS (SIGNIFICANT ONLY: GREEN) =====================
+# Based on your SPSS "Variables in the Equation" (green Sig. values).
+# Keep Constant for the logistic equation.
+COEF = {
+    "Tahap Pendidikan=Undergraduate(1)": -0.537,
+    "Pekerjaan=Pekerja Kerajaan(1)": 0.803,
+    "Pekerjaan=Pekerja Swasta(1)": 0.912,
+    "Jenis Penyewaan=Bilik(1)": 1.121,
+    "Jenis rumah sewa=Kondominium(1)": -1.007,
+    "Jenis rumah sewa=Pangsapuri(1)": -0.604,
+    "Jenis rumah sewa=Rumah 1 unit(1)": -0.711,
+    "Jenis rumah sewa=Rumah Teres(1)": 0.526,
+    "Jenis kelengkapan perabot=Berperabot separa(1)": -0.370,
+    "deposit_2_1(1)": 0.556,
+    "Berapa lama anda telah menyewa rumah=3-5 tahun(1)": 0.413,
+    "Berapa lama anda telah menyewa rumah=6+ tahun(1)": -0.584,
+    "Constant": 0.310,
+}
+
+
+# ===================== OPTIONS (FOLLOW YOUR “LIST OF VARIABLES & CATEGORIES” PIC) =====================
+# (Internal values remain the same; we only display bilingual label.)
+OPTIONS = {
+    "Jantina": ["Lelaki", "Perempuan"],
+    "Warganegara": ["Malaysian", "Non-Malaysian"],
+    "Bangsa": ["Bumiputera", "Cina", "India", "Lain-lain"],
+    "Agama": ["Islam", "Buddha", "Hindu", "Lain-lain"],
+    "Status Perkahwinan": ["Single", "Bercerai", "Berkahwin"],
+    "Tahap Pendidikan": ["SPM dan ke bawah", "Undergraduate", "Postgraduate"],
+    "Pekerjaan": ["Tidak bekerja", "Bekerja sendiri", "Lain-lain", "Pekerja Kerajaan", "Pekerja Swasta", "Pesara"],
+    "Bilangan Isi Rumah": ["Kurang dari 2 orang", "3 - 4 orang", "Lebih 5 orang"],
+    "Bilangan Tanggungan": ["Kurang dari 2 orang", "3 - 4 orang", "Lebih 5 orang"],
+    "Jenis Penyewaan": ["Rumah", "Bilik"],
+    "Jenis Rumah Sewa": ["Flat", "Condominium", "Lain-lain", "Pangsapuri", "Rumah 1 unit", "Rumah Teres"],
+    "Jenis Kelengkapan Perabot": ["Tiada perabot", "Perabot penuh", "Perabot separa"],
+    "Deposit": ["Tiada deposit", "1 + 1", "2 + 1", "3 + 1"],
+    "Tempoh Menyewa": ["Kurang 2 tahun", "3 - 5 tahun", "Lebih 6 tahun"],
+    "Skim": ["Ya", "Tidak"],
+}
+
+# --- Display (bilingual) for dropdown options (English first) ---
+DISPLAY = {
+    "Jantina": {"Lelaki": "Male (Lelaki)", "Perempuan": "Female (Perempuan)"},
+    "Warganegara": {
+        "Malaysian": "Malaysian (Warganegara Malaysia)",
+        "Non-Malaysian": "Non-Malaysian (Bukan warganegara)",
+    },
+    "Bangsa": {
+        "Bumiputera": "Bumiputera (Bumiputera)",
+        "Cina": "Chinese (Cina)",
+        "India": "Indian (India)",
+        "Lain-lain": "Other (Lain-lain)",
+    },
+    "Agama": {
+        "Islam": "Islam (Islam)",
+        "Buddha": "Buddhism (Buddha)",
+        "Hindu": "Hinduism (Hindu)",
+        "Lain-lain": "Other (Lain-lain)",
+    },
+    "Status Perkahwinan": {
+        "Single": "Single (Bujang)",
+        "Bercerai": "Divorced (Bercerai)",
+        "Berkahwin": "Married (Berkahwin)",
+    },
+    "Tahap Pendidikan": {
+        "SPM dan ke bawah": "SPM & below (SPM dan ke bawah)",
+        "Undergraduate": "Undergraduate (Ijazah Sarjana Muda)",
+        "Postgraduate": "Postgraduate (Pascasiswazah)",
+    },
+    "Pekerjaan": {
+        "Tidak bekerja": "Unemployed (Tidak bekerja)",
+        "Bekerja sendiri": "Self-employed (Bekerja sendiri)",
+        "Lain-lain": "Other (Lain-lain)",
+        "Pekerja Kerajaan": "Government employee (Pekerja Kerajaan)",
+        "Pekerja Swasta": "Private employee (Pekerja Swasta)",
+        "Pesara": "Retired (Pesara)",
+    },
+    "Bilangan Isi Rumah": {
+        "Kurang dari 2 orang": "1–2 people (Kurang dari 2 orang)",
+        "3 - 4 orang": "3–4 people (3–4 orang)",
+        "Lebih 5 orang": "5+ people (Lebih 5 orang)",
+    },
+    "Bilangan Tanggungan": {
+        "Kurang dari 2 orang": "Less than 2 (Kurang dari 2)",
+        "3 - 4 orang": "3–4 (3–4 orang)",
+        "Lebih 5 orang": "More than 5 (Lebih 5)",
+    },
+    "Jenis Penyewaan": {"Rumah": "Whole unit/house (Rumah)", "Bilik": "Room (Bilik)"},
+    "Jenis Rumah Sewa": {
+        "Flat": "Flat (Flat)",
+        "Condominium": "Condominium (Kondominium)",
+        "Pangsapuri": "Apartment (Pangsapuri)",
+        "Rumah Teres": "Terrace house (Rumah Teres)",
+        "Rumah 1 unit": "Detached / single unit (Rumah 1 unit)",
+        "Lain-lain": "Other (Lain-lain)",
+    },
+    "Jenis Kelengkapan Perabot": {
+        "Tiada perabot": "Unfurnished (Tiada perabot)",
+        "Perabot penuh": "Fully furnished (Perabot penuh)",
+        "Perabot separa": "Partly furnished (Perabot separa)",
+    },
+    "Deposit": {
+        "Tiada deposit": "No deposit (Tiada deposit)",
+        "1 + 1": "1+1 deposit (1+1)",
+        "2 + 1": "2+1 deposit (2+1)",
+        "3 + 1": "3+1 deposit (3+1)",
+    },
+    "Tempoh Menyewa": {
+        "Kurang 2 tahun": "Less than 2 years (Kurang 2 tahun)",
+        "3 - 5 tahun": "3–5 years (3–5 tahun)",
+        "Lebih 6 tahun": "More than 6 years (Lebih 6 tahun)",
+    },
+    "Skim": {"Ya": "Yes (Ya)", "Tidak": "No (Tidak)"},
+}
+
+
+# -------------------- BILINGUAL LABEL + HELP --------------------
+def label_html(en: str, ms: str) -> str:
+    return f"""
+<div class="lbl">
+  <div class="en">{en}</div>
+  <div class="ms">{ms}</div>
+</div>
+""".strip()
+
+
+def help_text(en: str, ms: str) -> str:
+    return f"EN: {en}\nBM: {ms}"
+
+
+def fmt(field: str):
+    m = DISPLAY.get(field, {})
+    return lambda x: m.get(x, str(x))
+
+
+# -------------------- MODEL INPUTS (SIGNIFICANT ONLY) --------------------
 def build_inputs(
     edu_label: str,
     job_label: str,
@@ -291,47 +409,6 @@ def compute_table(inputs: dict):
 # ===================== GOOGLE SHEETS (APPEND ROW) =====================
 SHEET_ID_DEFAULT = "1sv9VlXO07K-wcmNCRVO5fvZcrzGcI4gncxfFVR73wxc"  # your sheet id
 
-
-def sheets_status():
-    """
-    Returns (ok: bool, msg: str)
-    """
-    if gspread is None or Credentials is None:
-        return (
-            False,
-            "Missing libraries. Install: pip install gspread google-auth",
-        )
-
-    # Secrets required (service account JSON goes into secrets)
-    try:
-        _ = st.secrets["gcp_service_account"]
-    except Exception:
-        return (
-            False,
-            "Missing Streamlit secret: [gcp_service_account].",
-        )
-
-    # Sheet ID can be provided via secrets, but we default to your given sheet id
-    # (still recommended to store in secrets).
-    return (True, "Google Sheets is ready.")
-
-
-def get_sheet():
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
-    ]
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=scopes,
-    )
-    client = gspread.authorize(creds)
-
-    sheet_id = st.secrets.get("SHEET_ID", SHEET_ID_DEFAULT)
-    tab_name = st.secrets.get("SHEET_TAB", "Sheet1")
-    return client.open_by_key(sheet_id).worksheet(tab_name)
-
-
 SHEET_COLS = [
     "timestamp",
     "jantina",
@@ -360,18 +437,46 @@ SHEET_COLS = [
 ]
 
 
+def sheets_status():
+    """
+    Returns (ok: bool, msg: str)
+    """
+    if gspread is None or Credentials is None:
+        return False, "Missing libraries. Install: pip install gspread google-auth"
+
+    try:
+        _ = st.secrets["gcp_service_account"]
+    except Exception:
+        return False, "Missing Streamlit secret: [gcp_service_account]."
+
+    return True, "Google Sheets is ready."
+
+
+def get_sheet():
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    creds = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=scopes,
+    )
+    client = gspread.authorize(creds)
+
+    sheet_id = st.secrets.get("SHEET_ID", SHEET_ID_DEFAULT)
+    tab_name = st.secrets.get("SHEET_TAB", "Sheet1")
+    return client.open_by_key(sheet_id).worksheet(tab_name)
+
+
 def ensure_header(ws):
     try:
         first_row = ws.row_values(1)
         if first_row != SHEET_COLS:
-            # If empty sheet, insert header at row 1
             if not first_row:
                 ws.insert_row(SHEET_COLS, 1)
             else:
-                # If something exists, put header as first row (keeps your data below)
                 ws.insert_row(SHEET_COLS, 1)
     except Exception:
-        # Don't block app if header check fails
         pass
 
 
@@ -381,6 +486,9 @@ def append_to_sheet(payload: dict) -> None:
     row = [payload.get(c, "") for c in SHEET_COLS]
     ws.append_row(row, value_input_option="USER_ENTERED")
 
+
+# ===================== STREAMLIT CONFIG =====================
+st.set_page_config(page_title="Rental Affordability Checker", layout="wide")
 
 # ======================== TOP BAR ========================
 logo_paths = [
@@ -443,7 +551,10 @@ st.markdown(
     background: {PAGE_BG} !important;
     color: {TXT} !important;
   }}
-  .block-container {{ padding-top: .75rem; }}
+  .block-container {{
+    padding-top: .75rem;
+    max-width: 100% !important;
+  }}
 
   .purple-card {{
     background: {CARD_BG};
@@ -455,6 +566,22 @@ st.markdown(
 
   h1,h2,h3,h4,h5,h6, p, div, span, label, small {{
     color: {TXT} !important;
+  }}
+
+  /* Bilingual label */
+  .lbl {{
+    margin: 0 0 .25rem 0;
+    line-height: 1.1;
+  }}
+  .lbl .en {{
+    font-weight: 800;
+    font-size: 14px;
+    color: {TXT};
+  }}
+  .lbl .ms {{
+    font-size: 12px;
+    opacity: .80;
+    color: {TXT};
   }}
 
   /* ========= INPUTS ========= */
@@ -571,6 +698,12 @@ st.markdown(
     border-color: rgba(239,68,68,0.35);
   }}
 
+  /* Metrics size */
+  [data-testid="stMetricValue"] > div {{
+    font-size: 2rem !important;
+    line-height: 1.15 !important;
+  }}
+
   /* ===== LOGO ===== */
   .logo-wrap {{ display:flex; justify-content:flex-end; }}
   .logo-strip {{
@@ -604,45 +737,253 @@ with left:
     st.subheader("User Inputs")
 
     colA, colB = st.columns(2)
+
     with colA:
-        jantina = st.selectbox("Jantina", OPTIONS["Jantina"], index=0)
-        warganegara = st.selectbox("Warganegara", OPTIONS["Warganegara"], index=0)
-        bangsa = st.selectbox("Bangsa", OPTIONS["Bangsa"], index=0)
-        agama = st.selectbox("Agama", OPTIONS["Agama"], index=0)
-        status_kahwin = st.selectbox("Status Perkahwinan", OPTIONS["Status Perkahwinan"], index=0)
-        tahap_pendidikan = st.selectbox("Tahap Pendidikan", OPTIONS["Tahap Pendidikan"], index=0)
+        st.markdown(label_html("Gender", "Jantina"), unsafe_allow_html=True)
+        jantina = st.selectbox(
+            "jantina_hidden",
+            OPTIONS["Jantina"],
+            index=0,
+            format_func=fmt("Jantina"),
+            label_visibility="collapsed",
+            help=help_text(
+                "Select the respondent's gender.",
+                "Pilih jantina responden.",
+            ),
+        )
+
+        st.markdown(label_html("Nationality", "Warganegara"), unsafe_allow_html=True)
+        warganegara = st.selectbox(
+            "warganegara_hidden",
+            OPTIONS["Warganegara"],
+            index=0,
+            format_func=fmt("Warganegara"),
+            label_visibility="collapsed",
+            help=help_text(
+                "Select whether the respondent is Malaysian or non-Malaysian.",
+                "Pilih sama ada responden warganegara Malaysia atau bukan warganegara.",
+            ),
+        )
+
+        st.markdown(label_html("Ethnicity", "Bangsa"), unsafe_allow_html=True)
+        bangsa = st.selectbox(
+            "bangsa_hidden",
+            OPTIONS["Bangsa"],
+            index=0,
+            format_func=fmt("Bangsa"),
+            label_visibility="collapsed",
+            help=help_text(
+                "Choose the ethnicity category.",
+                "Pilih kategori bangsa.",
+            ),
+        )
+
+        st.markdown(label_html("Religion", "Agama"), unsafe_allow_html=True)
+        agama = st.selectbox(
+            "agama_hidden",
+            OPTIONS["Agama"],
+            index=0,
+            format_func=fmt("Agama"),
+            label_visibility="collapsed",
+            help=help_text(
+                "Choose the religion category.",
+                "Pilih kategori agama.",
+            ),
+        )
+
+        st.markdown(label_html("Marital status", "Status perkahwinan"), unsafe_allow_html=True)
+        status_kahwin = st.selectbox(
+            "status_hidden",
+            OPTIONS["Status Perkahwinan"],
+            index=0,
+            format_func=fmt("Status Perkahwinan"),
+            label_visibility="collapsed",
+            help=help_text(
+                "Select marital status.",
+                "Pilih status perkahwinan.",
+            ),
+        )
+
+        st.markdown(label_html("Education level", "Tahap pendidikan"), unsafe_allow_html=True)
+        tahap_pendidikan = st.selectbox(
+            "edu_hidden",
+            OPTIONS["Tahap Pendidikan"],
+            index=0,
+            format_func=fmt("Tahap Pendidikan"),
+            label_visibility="collapsed",
+            help=help_text(
+                "Select the highest education level.",
+                "Pilih tahap pendidikan tertinggi.",
+            ),
+        )
 
     with colB:
-        pekerjaan = st.selectbox("Pekerjaan", OPTIONS["Pekerjaan"], index=0)
-        bil_isi_rumah = st.selectbox("Bilangan Isi Rumah", OPTIONS["Bilangan Isi Rumah"], index=0)
-        bil_tanggungan = st.selectbox("Bilangan Tanggungan", OPTIONS["Bilangan Tanggungan"], index=0)
+        st.markdown(label_html("Occupation", "Pekerjaan"), unsafe_allow_html=True)
+        pekerjaan = st.selectbox(
+            "job_hidden",
+            OPTIONS["Pekerjaan"],
+            index=0,
+            format_func=fmt("Pekerjaan"),
+            label_visibility="collapsed",
+            help=help_text(
+                "Select the occupation category.",
+                "Pilih kategori pekerjaan.",
+            ),
+        )
 
-        jenis_penyewaan = st.selectbox("Jenis Penyewaan", OPTIONS["Jenis Penyewaan"], index=0)
-        jenis_rumah_sewa = st.selectbox("Jenis Rumah Sewa", OPTIONS["Jenis Rumah Sewa"], index=0)
-        jenis_perabot = st.selectbox("Jenis Kelengkapan Perabot", OPTIONS["Jenis Kelengkapan Perabot"], index=0)
-        deposit = st.selectbox("Deposit", OPTIONS["Deposit"], index=0)
-        tempoh_menyewa = st.selectbox("Tempoh Menyewa", OPTIONS["Tempoh Menyewa"], index=0)
-        skim = st.selectbox("Skim", OPTIONS["Skim"], index=0)
+        st.markdown(label_html("Household size", "Bilangan isi rumah"), unsafe_allow_html=True)
+        bil_isi_rumah = st.selectbox(
+            "hh_hidden",
+            OPTIONS["Bilangan Isi Rumah"],
+            index=0,
+            format_func=fmt("Bilangan Isi Rumah"),
+            label_visibility="collapsed",
+            help=help_text(
+                "Total number of people living in the household.",
+                "Jumlah orang yang tinggal dalam isi rumah.",
+            ),
+        )
+
+        st.markdown(label_html("Number of dependents", "Bilangan tanggungan"), unsafe_allow_html=True)
+        bil_tanggungan = st.selectbox(
+            "dep_hidden",
+            OPTIONS["Bilangan Tanggungan"],
+            index=0,
+            format_func=fmt("Bilangan Tanggungan"),
+            label_visibility="collapsed",
+            help=help_text(
+                "Number of dependents supported financially.",
+                "Bilangan tanggungan yang ditanggung dari segi kewangan.",
+            ),
+        )
+
+        st.markdown(label_html("Rental type", "Jenis penyewaan"), unsafe_allow_html=True)
+        jenis_penyewaan = st.selectbox(
+            "jenis_penyewaan_hidden",
+            OPTIONS["Jenis Penyewaan"],
+            index=0,
+            format_func=fmt("Jenis Penyewaan"),
+            label_visibility="collapsed",
+            help=help_text(
+                "Choose whether renting a whole unit/house or just a room.",
+                "Pilih sama ada menyewa rumah/unit atau bilik sahaja.",
+            ),
+        )
+
+        st.markdown(label_html("Type of rental housing", "Jenis rumah sewa"), unsafe_allow_html=True)
+        jenis_rumah_sewa = st.selectbox(
+            "jenis_rumah_hidden",
+            OPTIONS["Jenis Rumah Sewa"],
+            index=0,
+            format_func=fmt("Jenis Rumah Sewa"),
+            label_visibility="collapsed",
+            help=help_text(
+                "Select the rental housing type (e.g., flat/condo/apartment/terrace).",
+                "Pilih jenis rumah sewa (cth: flat/kondo/pangsapuri/teres).",
+            ),
+        )
+
+        st.markdown(label_html("Furnished type", "Jenis kelengkapan perabot"), unsafe_allow_html=True)
+        jenis_perabot = st.selectbox(
+            "perabot_hidden",
+            OPTIONS["Jenis Kelengkapan Perabot"],
+            index=0,
+            format_func=fmt("Jenis Kelengkapan Perabot"),
+            label_visibility="collapsed",
+            help=help_text(
+                "Indicate the furnishing level of the rental unit.",
+                "Nyatakan tahap perabot bagi rumah sewa.",
+            ),
+        )
+
+        st.markdown(label_html("Deposit", "Deposit"), unsafe_allow_html=True)
+        deposit = st.selectbox(
+            "deposit_hidden",
+            OPTIONS["Deposit"],
+            index=0,
+            format_func=fmt("Deposit"),
+            label_visibility="collapsed",
+            help=help_text(
+                "Choose the deposit arrangement (example: 2+1 = 2 months deposit + 1 month utility).",
+                "Pilih jenis deposit (cth: 2+1 = 2 bulan deposit + 1 bulan utiliti).",
+            ),
+        )
+
+        st.markdown(label_html("Years renting", "Tempoh menyewa"), unsafe_allow_html=True)
+        tempoh_menyewa = st.selectbox(
+            "tempoh_hidden",
+            OPTIONS["Tempoh Menyewa"],
+            index=0,
+            format_func=fmt("Tempoh Menyewa"),
+            label_visibility="collapsed",
+            help=help_text(
+                "How long the respondent has been renting.",
+                "Tempoh responden telah menyewa.",
+            ),
+        )
+
+        st.markdown(label_html("Know affordable rental scheme?", "Tahu skim mampu sewa?"), unsafe_allow_html=True)
+        skim = st.selectbox(
+            "skim_hidden",
+            OPTIONS["Skim"],
+            index=0,
+            format_func=fmt("Skim"),
+            label_visibility="collapsed",
+            help=help_text(
+                "Whether the respondent is aware of affordable rental schemes.",
+                "Sama ada responden tahu skim mampu sewa.",
+            ),
+        )
 
     st.divider()
     st.subheader("Income & Rent Inputs")
+
     c1, c2, c3 = st.columns(3)
     with c1:
-        income = st.number_input("Monthly Income (RM)", min_value=0.0, value=6000.0, step=100.0)
+        st.markdown(label_html("Monthly income (RM)", "Pendapatan bulanan (RM)"), unsafe_allow_html=True)
+        income = st.number_input(
+            "income_hidden",
+            min_value=0.0,
+            value=6000.0,
+            step=100.0,
+            label_visibility="collapsed",
+            help=help_text(
+                "Enter total monthly household income in RM.",
+                "Masukkan jumlah pendapatan isi rumah bulanan (RM).",
+            ),
+        )
     with c2:
-        rent = st.number_input("Monthly Rent (RM)", min_value=0.0, value=2000.0, step=50.0)
+        st.markdown(label_html("Monthly rent (RM)", "Sewa bulanan (RM)"), unsafe_allow_html=True)
+        rent = st.number_input(
+            "rent_hidden",
+            min_value=0.0,
+            value=2000.0,
+            step=50.0,
+            label_visibility="collapsed",
+            help=help_text(
+                "Enter the monthly rent amount in RM.",
+                "Masukkan jumlah sewa bulanan (RM).",
+            ),
+        )
     with c3:
+        st.markdown(label_html("Rent ratio threshold", "Had nisbah sewa"), unsafe_allow_html=True)
         ratio = st.number_input(
-            "Rent ratio threshold",
+            "ratio_hidden",
             min_value=0.0,
             max_value=1.0,
             value=0.38,
             step=0.01,
-            help="Affordability ratio used in Condition B (example: 0.30 means rent should be ≤ 30% of income).",
+            label_visibility="collapsed",
+            help=help_text(
+                "Maximum recommended rent share of income (example: 0.38 = 38%).",
+                "Had maksimum sewa berbanding pendapatan (cth: 0.38 = 38%).",
+            ),
         )
 
     st.divider()
     st.subheader("Spreadsheet Logging (Google Sheets)")
+    st.caption("EN: Optional logging to your private Google Sheet.  •  BM: Simpan rekod ke Google Sheet peribadi (pilihan).")
+
     save_to_sheet = st.toggle("Save submission to spreadsheet", value=False)
 
     ok_sheet, msg_sheet = sheets_status()
@@ -650,8 +991,8 @@ with left:
         if ok_sheet:
             st.success(msg_sheet)
             st.caption(
-                "Note: users will NOT see your spreadsheet. Only the Service Account writes to it. "
-                "Make sure you shared the sheet to the Service Account email as Editor."
+                "EN: Users will NOT see your spreadsheet. Only the Service Account writes to it.\n"
+                "BM: Pengguna TIDAK akan nampak spreadsheet. Hanya Service Account yang menulis data."
             )
         else:
             st.warning(
@@ -681,7 +1022,6 @@ if run:
         tempoh_label=tempoh_menyewa,
     )
 
-    # z and p are calculated by Streamlit (as you wanted)
     _df, z, p = compute_table(inputs)
 
     ok_a = p >= P_THRESHOLD
@@ -819,7 +1159,7 @@ with right:
 # 2) Create Service Account + enable Google Sheets API, then download JSON key.
 #
 # 3) Share your Google Sheet to service account email (Editor).
-#    Example email looks like: xxx@xxx.iam.gserviceaccount.com
+#    Example email: xxx@xxx.iam.gserviceaccount.com
 #
 # 4) Put secrets in Streamlit:
 #    - Local: .streamlit/secrets.toml
