@@ -40,97 +40,42 @@ def logo_strip_html(paths, height_px=42, gap_px=10):
 
 st.set_page_config(page_title="Rental Affordability Checker", layout="wide")
 
-# -------------------- COEFFICIENTS (UPDATED: COLUMN B) --------------------
+# ===================== COEFFICIENTS (SIGNIFICANT ONLY: GREEN) =====================
+# Based on your SPSS "Variables in the Equation" (green Sig. values).
+# Keep Constant for the logistic equation.
 COEF = {
-    "Umur": 0.002,
-    "Jantina ketua keluarga(1)": 0.007,
-    "Warganegara(1)": -0.818,
-    "Bangsa=Cina(1)": -0.411,
-    "Bangsa=India(1)": 0.463,
-    "Bangsa=Lain-lain(1)": 0.849,
-    "Agama=Buddha(1)": 0.131,
-    "Agama=Hindu(1)": -0.525,
-    "Agama=Lain-lain(1)": -0.158,
-    "Status Perkahwinan=Berkahwin(1)": -0.007,
-    "Status Perkahwinan=Cerai/BaluDuda/Pisah(1)": 0.313,
     "Tahap Pendidikan=Undergraduate(1)": -0.537,
-    "Tahap Pendidikan=Postgraduate(1)": -0.808,
-    "Pekerjaan=Bekerja sendiri(1)": 0.198,
-    "Pekerjaan=Lain-lain(1)": -0.801,
     "Pekerjaan=Pekerja Kerajaan(1)": 0.803,
     "Pekerjaan=Pekerja Swasta(1)": 0.912,
-    "Pekerjaan=Pesara(1)": 0.018,
-    "Bilangan isi rumah=3-4 orang(1)": 0.096,
-    "Bilangan isi rumah=5+ orang(1)": -0.403,
-    "Bilangan tanggungan=3-4 orang(1)": -0.028,
-    "Bilangan tanggungan=5+ orang(1)": -0.134,
     "Jenis Penyewaan=Bilik(1)": 1.121,
     "Jenis rumah sewa=Kondominium(1)": -1.007,
-    "Jenis rumah sewa=Lain-lain(1)": -0.598,
     "Jenis rumah sewa=Pangsapuri(1)": -0.604,
     "Jenis rumah sewa=Rumah 1 unit(1)": -0.711,
     "Jenis rumah sewa=Rumah Teres(1)": 0.526,
-    "Jenis kelengkapan perabot=Berperabot penuh(1)": -0.053,
     "Jenis kelengkapan perabot=Berperabot separa(1)": -0.370,
-    "deposit_1_1(1)": 0.339,
     "deposit_2_1(1)": 0.556,
-    "deposit_3_1(1)": 0.686,
     "Berapa lama anda telah menyewa rumah=3-5 tahun(1)": 0.413,
     "Berapa lama anda telah menyewa rumah=6+ tahun(1)": -0.584,
-    "Adakah anda mengetahui terdapat skim mampu sewa di Malaysia? (contoh: SMART sewa)(1)": 0.200,
     "Constant": 0.310,
 }
 
-# -------------------- ENGLISH OPTIONS --------------------
+# ===================== OPTIONS (FOLLOW YOUR “LIST OF VARIABLES & CATEGORIES” PIC) =====================
 OPTIONS = {
-    "Gender": ["Man", "Woman"],
-    "Nationality": ["Malaysian citizen", "Non-Malaysian citizen"],
-    "Ethnicity": ["Malay", "Chinese", "Indian", "Sabah", "Sarawak"],
-    "Religion": ["Islam", "Buddhism", "Hinduism", "Others"],
-    "Marital Status": ["Single", "Married", "Widowed", "Divorced", "Separated"],
-    "Education Level": [
-        "No certificate",
-        "UPSR",
-        "PT3",
-        "SPM",
-        "STPM",
-        "Certificate/TVET",
-        "Certificate (Polytechnic/University)",
-        "Diploma",
-        "Bachelor's Degree",
-    ],
-    "Occupation": [
-        "Unemployed",
-        "Government employee",
-        "Private employee",
-        "Self-employed",
-        "Homemaker",
-        "Student",
-        "Government retiree",
-    ],
-    "Household Size": ["1 person", "2 people", "3–4 people", "5–6 people", "7 people or more"],
-    "Number of Dependents": ["None", "1–2 people", "3–4 people", "5–6 people", "7 people or more"],
-    "Type of Rental Housing (labels)": [
-        "Flat",
-        "Apartment",
-        "Condominium",
-        "Terrace House (Single storey)",
-        "Terrace House (Double storey)",
-        "One-unit house",
-    ],
-    "Type of Rental Housing (codes)": [2, 3, 4, 5, 6, 7],
-    "Furnished Type": ["None", "Furnished"],
-    "Deposit": [
-        "No deposit",
-        "1 + 1",
-        "2 + 1",
-        "3 + 1",
-        "1 + 1 + utility",
-        "2 + 1 + utility",
-        "3 + 1 + utility",
-    ],
-    "Total years renting": ["Less than 6 months", "Less than 1 year", "1–2 years", "3–5 years", "6–10 years"],
-    "Known SMART SEWA": ["Yes", "No"],
+    "Jantina": ["Lelaki", "Perempuan"],
+    "Warganegara": ["Malaysian", "Non-Malaysian"],
+    "Bangsa": ["Bumiputera", "Cina", "India", "Lain-lain"],
+    "Agama": ["Islam", "Buddha", "Hindu", "Lain-lain"],
+    "Status Perkahwinan": ["Single", "Bercerai", "Berkahwin"],
+    "Tahap Pendidikan": ["SPM dan ke bawah", "Undergraduate", "Postgraduate"],
+    "Pekerjaan": ["Tidak bekerja", "Bekerja sendiri", "Lain-lain", "Pekerja Kerajaan", "Pekerja Swasta", "Pesara"],
+    "Bilangan Isi Rumah": ["Kurang dari 2 orang", "3 - 4 orang", "Lebih 5 orang"],
+    "Bilangan Tanggungan": ["Kurang dari 2 orang", "3 - 4 orang", "Lebih 5 orang"],
+    "Jenis Penyewaan": ["Rumah", "Bilik"],
+    "Jenis Rumah Sewa": ["Flat", "Condominium", "Lain-lain", "Pangsapuri", "Rumah 1 unit", "Rumah Teres"],
+    "Jenis Kelengkapan Perabot": ["Tiada perabot", "Perabot penuh", "Perabot separa"],
+    "Deposit": ["Tiada deposit", "1 + 1", "2 + 1", "3 + 1"],
+    "Tempoh Menyewa": ["Kurang 2 tahun", "3 - 5 tahun", "Lebih 6 tahun"],
+    "Skim": ["Ya", "Tidak"],
 }
 
 
@@ -269,110 +214,60 @@ def svg_gauge_html(
 
 
 def build_inputs(
-    age: int,
-    gender_idx: int,
-    nationality_idx: int,
-    ethnicity_idx: int,
-    religion_idx: int,
-    marital_idx: int,
-    edu_idx: int,
-    job_idx: int,
-    household_idx: int,
-    dep_idx: int,
-    rental_code: int,
-    furnish_idx: int,
-    deposit_idx: int,
-    years_idx: int,
-    smart_idx: int,
+    edu_label: str,
+    job_label: str,
+    jenis_penyewaan_label: str,
+    jenis_rumah_sewa_label: str,
+    perabot_label: str,
+    deposit_label: str,
+    tempoh_label: str,
 ) -> dict:
+    # Only significant variables + constant
     inp = {k: 0.0 for k in COEF.keys()}
     inp["Constant"] = 1.0
-    inp["Umur"] = float(age)
 
-    inp["Jantina ketua keluarga(1)"] = 1.0 if gender_idx == 1 else 0.0
-    inp["Warganegara(1)"] = 1.0 if nationality_idx == 1 else 0.0
-
-    eth_label = OPTIONS["Ethnicity"][ethnicity_idx]
-    if eth_label == "Chinese":
-        inp["Bangsa=Cina(1)"] = 1.0
-    elif eth_label == "Indian":
-        inp["Bangsa=India(1)"] = 1.0
-    elif eth_label != "Malay":
-        inp["Bangsa=Lain-lain(1)"] = 1.0
-
-    rel_label = OPTIONS["Religion"][religion_idx]
-    if rel_label == "Buddhism":
-        inp["Agama=Buddha(1)"] = 1.0
-    elif rel_label == "Hinduism":
-        inp["Agama=Hindu(1)"] = 1.0
-    elif rel_label != "Islam":
-        inp["Agama=Lain-lain(1)"] = 1.0
-
-    mar_label = OPTIONS["Marital Status"][marital_idx]
-    if mar_label == "Married":
-        inp["Status Perkahwinan=Berkahwin(1)"] = 1.0
-    elif mar_label in ("Widowed", "Divorced", "Separated"):
-        inp["Status Perkahwinan=Cerai/BaluDuda/Pisah(1)"] = 1.0
-
-    edu_label = OPTIONS["Education Level"][edu_idx]
-    if edu_label in ("Diploma", "Bachelor's Degree"):
+    # Education
+    if edu_label == "Undergraduate":
         inp["Tahap Pendidikan=Undergraduate(1)"] = 1.0
 
-    job_label = OPTIONS["Occupation"][job_idx]
-    if job_label == "Self-employed":
-        inp["Pekerjaan=Bekerja sendiri(1)"] = 1.0
-    elif job_label == "Government employee":
+    # Occupation (only significant ones)
+    if job_label == "Pekerja Kerajaan":
         inp["Pekerjaan=Pekerja Kerajaan(1)"] = 1.0
-    elif job_label == "Private employee":
+    elif job_label == "Pekerja Swasta":
         inp["Pekerjaan=Pekerja Swasta(1)"] = 1.0
-    elif job_label == "Government retiree":
-        inp["Pekerjaan=Pesara(1)"] = 1.0
-    elif job_label in ("Homemaker", "Student"):
-        inp["Pekerjaan=Lain-lain(1)"] = 1.0
 
-    if household_idx == 2:
-        inp["Bilangan isi rumah=3-4 orang(1)"] = 1.0
-    elif household_idx in (3, 4):
-        inp["Bilangan isi rumah=5+ orang(1)"] = 1.0
+    # Type of rental (Rumah/Bilik)
+    if jenis_penyewaan_label == "Bilik":
+        inp["Jenis Penyewaan=Bilik(1)"] = 1.0
 
-    if dep_idx == 2:
-        inp["Bilangan tanggungan=3-4 orang(1)"] = 1.0
-    elif dep_idx in (3, 4):
-        inp["Bilangan tanggungan=5+ orang(1)"] = 1.0
-
-    if rental_code == 4:
+    # House type (only significant ones)
+    if jenis_rumah_sewa_label == "Condominium":
         inp["Jenis rumah sewa=Kondominium(1)"] = 1.0
-    elif rental_code in (2, 3):
+    elif jenis_rumah_sewa_label == "Pangsapuri":
         inp["Jenis rumah sewa=Pangsapuri(1)"] = 1.0
-    elif rental_code in (5, 6):
-        inp["Jenis rumah sewa=Rumah Teres(1)"] = 1.0
-    elif rental_code == 7:
+    elif jenis_rumah_sewa_label == "Rumah 1 unit":
         inp["Jenis rumah sewa=Rumah 1 unit(1)"] = 1.0
+    elif jenis_rumah_sewa_label == "Rumah Teres":
+        inp["Jenis rumah sewa=Rumah Teres(1)"] = 1.0
 
-    if furnish_idx == 1:
-        inp["Jenis kelengkapan perabot=Berperabot penuh(1)"] = 1.0
+    # Furnish type (only separa significant)
+    if perabot_label == "Perabot separa":
+        inp["Jenis kelengkapan perabot=Berperabot separa(1)"] = 1.0
 
-    dep_label = OPTIONS["Deposit"][deposit_idx]
-    if dep_label == "1 + 1":
-        inp["deposit_1_1(1)"] = 1.0
-    elif dep_label == "2 + 1":
+    # Deposit (only 2+1 significant)
+    if deposit_label == "2 + 1":
         inp["deposit_2_1(1)"] = 1.0
-    elif dep_label == "3 + 1":
-        inp["deposit_3_1(1)"] = 1.0
 
-    if years_idx == 3:
+    # Renting duration (only 3-5 and 6+ significant)
+    if tempoh_label == "3 - 5 tahun":
         inp["Berapa lama anda telah menyewa rumah=3-5 tahun(1)"] = 1.0
-    elif years_idx == 4:
+    elif tempoh_label == "Lebih 6 tahun":
         inp["Berapa lama anda telah menyewa rumah=6+ tahun(1)"] = 1.0
 
-    inp["Adakah anda mengetahui terdapat skim mampu sewa di Malaysia? (contoh: SMART sewa)(1)"] = (
-        1.0 if smart_idx == 1 else 0.0
-    )
     return inp
 
 
 def compute_table(inputs: dict):
-    # Keep compute internally for z and p (UI doesn't show table anymore)
     rows = []
     for var, coef in COEF.items():
         x = float(inputs.get(var, 0.0))
@@ -606,34 +501,33 @@ with left:
 
     colA, colB = st.columns(2)
     with colA:
-        age = st.number_input("Age (years)", min_value=15, max_value=100, value=38, step=1, help="Your age (years).")
-        gender = st.selectbox("Gender", OPTIONS["Gender"], index=0, help="Your gender.")
-        nationality = st.selectbox("Nationality", OPTIONS["Nationality"], index=0, help="Your nationality status.")
-        ethnicity = st.selectbox("Ethnicity", OPTIONS["Ethnicity"], index=0, help="Your ethnic background.")
-        religion = st.selectbox("Religion", OPTIONS["Religion"], index=0, help="Your religion.")
-        marital = st.selectbox("Marital Status", OPTIONS["Marital Status"], index=0, help="Your current marital status.")
-        edu = st.selectbox("Education Level", OPTIONS["Education Level"], index=0, help="Your highest education level.")
+        # Keep these (options refer to pic) even if not used in significant-only model (others maintain)
+        jantina = st.selectbox("Jantina", OPTIONS["Jantina"], index=0)
+        warganegara = st.selectbox("Warganegara", OPTIONS["Warganegara"], index=0)
+        bangsa = st.selectbox("Bangsa", OPTIONS["Bangsa"], index=0)
+        agama = st.selectbox("Agama", OPTIONS["Agama"], index=0)
+        status_kahwin = st.selectbox("Status Perkahwinan", OPTIONS["Status Perkahwinan"], index=0)
+        tahap_pendidikan = st.selectbox("Tahap Pendidikan", OPTIONS["Tahap Pendidikan"], index=0)
 
     with colB:
-        job = st.selectbox("Occupation", OPTIONS["Occupation"], index=0, help="Your current jobs.")
-        household = st.selectbox("Household Size", OPTIONS["Household Size"], index=0, help="Number of people living together.")
-        dependents = st.selectbox("Number of Dependents", OPTIONS["Number of Dependents"], index=0, help="Number of dependents you support.")
+        pekerjaan = st.selectbox("Pekerjaan", OPTIONS["Pekerjaan"], index=0)
+        bil_isi_rumah = st.selectbox("Bilangan Isi Rumah", OPTIONS["Bilangan Isi Rumah"], index=0)
+        bil_tanggungan = st.selectbox("Bilangan Tanggungan", OPTIONS["Bilangan Tanggungan"], index=0)
 
-        rental_label = st.selectbox("Type of Rental Housing", OPTIONS["Type of Rental Housing (labels)"], index=0, help="Type of house you rent.")
-        rental_code = OPTIONS["Type of Rental Housing (codes)"][OPTIONS["Type of Rental Housing (labels)"].index(rental_label)]
-
-        furnished = st.selectbox("Furnished Type", OPTIONS["Furnished Type"], index=0, help="Whether the house is furnished.")
-        deposit = st.selectbox("Deposit", OPTIONS["Deposit"], index=0, help="Your deposit arrangement.")
-        years = st.selectbox("Total years renting", OPTIONS["Total years renting"], index=0, help="How long you have been renting.")
-        smart = st.selectbox("Known SMART SEWA", OPTIONS["Known SMART SEWA"], index=0, help="Whether you know SMART SEWA scheme.")
+        jenis_penyewaan = st.selectbox("Jenis Penyewaan", OPTIONS["Jenis Penyewaan"], index=0)
+        jenis_rumah_sewa = st.selectbox("Jenis Rumah Sewa", OPTIONS["Jenis Rumah Sewa"], index=0)
+        jenis_perabot = st.selectbox("Jenis Kelengkapan Perabot", OPTIONS["Jenis Kelengkapan Perabot"], index=0)
+        deposit = st.selectbox("Deposit", OPTIONS["Deposit"], index=0)
+        tempoh_menyewa = st.selectbox("Tempoh Menyewa", OPTIONS["Tempoh Menyewa"], index=0)
+        skim = st.selectbox("Skim", OPTIONS["Skim"], index=0)
 
     st.divider()
     st.subheader("Income & Rent Inputs")
     c1, c2, c3 = st.columns(3)
     with c1:
-        income = st.number_input("Monthly Income (RM)", min_value=0.0, value=6000.0, step=100.0, help="Your total monthly income.")
+        income = st.number_input("Monthly Income (RM)", min_value=0.0, value=6000.0, step=100.0)
     with c2:
-        rent = st.number_input("Monthly Rent (RM)", min_value=0.0, value=2000.0, step=50.0, help="Your monthly rent payment.")
+        rent = st.number_input("Monthly Rent (RM)", min_value=0.0, value=2000.0, step=50.0)
     with c3:
         ratio = st.number_input(
             "Rent ratio threshold",
@@ -653,21 +547,13 @@ if "result" not in st.session_state:
 
 if run:
     inputs = build_inputs(
-        age=int(age),
-        gender_idx=OPTIONS["Gender"].index(gender),
-        nationality_idx=OPTIONS["Nationality"].index(nationality),
-        ethnicity_idx=OPTIONS["Ethnicity"].index(ethnicity),
-        religion_idx=OPTIONS["Religion"].index(religion),
-        marital_idx=OPTIONS["Marital Status"].index(marital),
-        edu_idx=OPTIONS["Education Level"].index(edu),
-        job_idx=OPTIONS["Occupation"].index(job),
-        household_idx=OPTIONS["Household Size"].index(household),
-        dep_idx=OPTIONS["Number of Dependents"].index(dependents),
-        rental_code=int(rental_code),
-        furnish_idx=OPTIONS["Furnished Type"].index(furnished),
-        deposit_idx=OPTIONS["Deposit"].index(deposit),
-        years_idx=OPTIONS["Total years renting"].index(years),
-        smart_idx=OPTIONS["Known SMART SEWA"].index(smart),
+        edu_label=tahap_pendidikan,
+        job_label=pekerjaan,
+        jenis_penyewaan_label=jenis_penyewaan,
+        jenis_rumah_sewa_label=jenis_rumah_sewa,
+        perabot_label=jenis_perabot,
+        deposit_label=deposit,
+        tempoh_label=tempoh_menyewa,
     )
 
     df, z, p = compute_table(inputs)
