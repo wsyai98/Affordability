@@ -4,6 +4,15 @@ import pandas as pd
 import streamlit as st
 from pathlib import Path
 import base64
+from datetime import datetime
+
+# Optional (Google Sheets). If not installed/configured, app still runs.
+try:
+    import gspread
+    from google.oauth2.service_account import Credentials
+except Exception:
+    gspread = None
+    Credentials = None
 
 # ==========================================================
 # Rental Affordability Checker (English UI)
@@ -278,6 +287,77 @@ def compute_table(inputs: dict):
     return df, z, p
 
 
+# ===================== GOOGLE SHEETS (APPEND ROW) =====================
+def sheets_is_ready() -> bool:
+    if gspread is None or Credentials is None:
+        return False
+    try:
+        _ = st.secrets["SHEET_ID"]
+        _ = st.secrets["gcp_service_account"]
+        return True
+    except Exception:
+        return False
+
+
+def get_sheet():
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    creds = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=scopes,
+    )
+    client = gspread.authorize(creds)
+    sheet_id = st.secrets["SHEET_ID"]
+    tab_name = st.secrets.get("SHEET_TAB", "Sheet1")
+    return client.open_by_key(sheet_id).worksheet(tab_name)
+
+
+def append_to_sheet(payload: dict) -> None:
+    ws = get_sheet()
+
+    # Define columns (fixed order)
+    cols = [
+        "timestamp",
+        "jantina",
+        "warganegara",
+        "bangsa",
+        "agama",
+        "status_perkahwinan",
+        "tahap_pendidikan",
+        "pekerjaan",
+        "bil_isi_rumah",
+        "bil_tanggungan",
+        "jenis_penyewaan",
+        "jenis_rumah_sewa",
+        "jenis_perabot",
+        "deposit",
+        "tempoh_menyewa",
+        "skim",
+        "income_rm",
+        "rent_rm",
+        "ratio_threshold",
+        "z",
+        "p",
+        "condition_a_ok",
+        "condition_b_ok",
+        "overall_ok",
+    ]
+
+    # Ensure header exists (best effort)
+    try:
+        existing = ws.row_values(1)
+        if not existing or existing[: len(cols)] != cols:
+            ws.insert_row(cols, 1)
+    except Exception:
+        # If header check fails, we still try append row below
+        pass
+
+    row = [payload.get(c, "") for c in cols]
+    ws.append_row(row, value_input_option="USER_ENTERED")
+
+
 # ======================== TOP BAR ========================
 logo_paths = [
     APP_DIR / "logo_kpkt.png",
@@ -501,7 +581,6 @@ with left:
 
     colA, colB = st.columns(2)
     with colA:
-        # Keep these (options refer to pic) even if not used in significant-only model (others maintain)
         jantina = st.selectbox("Jantina", OPTIONS["Jantina"], index=0)
         warganegara = st.selectbox("Warganegara", OPTIONS["Warganegara"], index=0)
         bangsa = st.selectbox("Bangsa", OPTIONS["Bangsa"], index=0)
@@ -538,6 +617,21 @@ with left:
             help="Affordability ratio used in Condition B (example: 0.30 means rent should be ≤ 30% of income).",
         )
 
+    st.divider()
+    st.subheader("Spreadsheet Logging (Google Sheets)")
+    save_to_sheet = st.toggle("Save submission to spreadsheet", value=False)
+
+    if save_to_sheet:
+        if sheets_is_ready():
+            st.success("Google Sheets is ready (secrets detected).")
+            st.caption("Each Run will append 1 new row into your sheet.")
+        else:
+            st.warning(
+                "Google Sheets is NOT ready. "
+                "Make sure you installed `gspread` and added Streamlit Secrets: "
+                "`SHEET_ID` and `[gcp_service_account]`."
+            )
+
     run = st.button("✅ Run Check", use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -556,7 +650,7 @@ if run:
         tempoh_label=tempoh_menyewa,
     )
 
-    df, z, p = compute_table(inputs)
+    _df, z, p = compute_table(inputs)
 
     ok_a = p >= P_THRESHOLD
     threshold = ratio * income
@@ -577,7 +671,62 @@ if run:
         "ok_a": ok_a,
         "ok_b": ok_b,
         "ok_all": ok_all,
+        # keep raw selections for logging
+        "raw": {
+            "jantina": jantina,
+            "warganegara": warganegara,
+            "bangsa": bangsa,
+            "agama": agama,
+            "status_perkahwinan": status_kahwin,
+            "tahap_pendidikan": tahap_pendidikan,
+            "pekerjaan": pekerjaan,
+            "bil_isi_rumah": bil_isi_rumah,
+            "bil_tanggungan": bil_tanggungan,
+            "jenis_penyewaan": jenis_penyewaan,
+            "jenis_rumah_sewa": jenis_rumah_sewa,
+            "jenis_perabot": jenis_perabot,
+            "deposit": deposit,
+            "tempoh_menyewa": tempoh_menyewa,
+            "skim": skim,
+        },
     }
+
+    # ===== append to Google Sheet if enabled =====
+    if save_to_sheet:
+        if sheets_is_ready():
+            payload = {
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "jantina": jantina,
+                "warganegara": warganegara,
+                "bangsa": bangsa,
+                "agama": agama,
+                "status_perkahwinan": status_kahwin,
+                "tahap_pendidikan": tahap_pendidikan,
+                "pekerjaan": pekerjaan,
+                "bil_isi_rumah": bil_isi_rumah,
+                "bil_tanggungan": bil_tanggungan,
+                "jenis_penyewaan": jenis_penyewaan,
+                "jenis_rumah_sewa": jenis_rumah_sewa,
+                "jenis_perabot": jenis_perabot,
+                "deposit": deposit,
+                "tempoh_menyewa": tempoh_menyewa,
+                "skim": skim,
+                "income_rm": float(income),
+                "rent_rm": float(rent),
+                "ratio_threshold": float(ratio),
+                "z": float(z),
+                "p": float(p),
+                "condition_a_ok": int(ok_a),
+                "condition_b_ok": int(ok_b),
+                "overall_ok": int(ok_all),
+            }
+            try:
+                append_to_sheet(payload)
+                st.toast("Saved to Google Sheets ✅", icon="✅")
+            except Exception as e:
+                st.error(f"Failed to save to Google Sheets: {e}")
+        else:
+            st.error("Google Sheets is not configured yet (missing secrets or libraries).")
 
 res = st.session_state["result"]
 
