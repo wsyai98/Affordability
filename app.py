@@ -205,28 +205,29 @@ def svg_gauge_html(
 """
 
 
-# ===================== COEFFICIENTS (SIGNIFICANT ONLY: GREEN) =====================
-# Based on your SPSS "Variables in the Equation" (green Sig. values).
-# Keep Constant for the logistic equation.
+# ===================== COEFFICIENTS (UPDATED: YOUR NEW TABLE) =====================
+# Notes:
+# - Removed variables: Bilangan Tanggungan, Deposit, Skim (as requested)
+# - Included Bilangan Isi Rumah (5+ group) based on your new coefficient line
 COEF = {
-    "Tahap Pendidikan=Undergraduate(1)": -0.537,
-    "Pekerjaan=Pekerja Kerajaan(1)": 0.803,
-    "Pekerjaan=Pekerja Swasta(1)": 0.912,
-    "Jenis Penyewaan=Bilik(1)": 1.121,
-    "Jenis rumah sewa=Kondominium(1)": -1.007,
-    "Jenis rumah sewa=Pangsapuri(1)": -0.604,
-    "Jenis rumah sewa=Rumah 1 unit(1)": -0.711,
-    "Jenis rumah sewa=Rumah Teres(1)": 0.526,
-    "Jenis kelengkapan perabot=Berperabot separa(1)": -0.370,
-    "deposit_2_1(1)": 0.556,
-    "Berapa lama anda telah menyewa rumah=3-5 tahun(1)": 0.413,
-    "Berapa lama anda telah menyewa rumah=6+ tahun(1)": -0.584,
-    "Constant": 0.310,
+    "Tahap Pendidikan=Undergraduate(1)": 0.509,
+    "Pekerjaan=Pekerja Kerajaan(1)": 0.760,
+    "Pekerjaan=Pekerja Swasta(1)": 0.799,
+    "Bilangan Isi Rumah=Lebih 5 orang(1)": 0.383,
+    "Jenis Penyewaan=Bilik(1)": 1.135,
+    "Jenis rumah sewa=Kondominium(1)": -1.028,
+    "Jenis rumah sewa=Pangsapuri(1)": -0.588,
+    "Jenis rumah sewa=Rumah 1 unit(1)": -0.683,
+    "Jenis rumah sewa=Rumah Teres(1)": -0.549,
+    "Jenis kelengkapan perabot=Berperabot separa(1)": -0.350,
+    "Berapa lama anda telah menyewa rumah=3-5 tahun(1)": 0.382,
+    "Berapa lama anda telah menyewa rumah=6+ tahun(1)": 0.624,
+    "Constant": 0.173,
 }
 
 
-# ===================== OPTIONS (FOLLOW YOUR “LIST OF VARIABLES & CATEGORIES” PIC) =====================
-# (Internal values remain the same; we only display bilingual label.)
+# ===================== OPTIONS (FOLLOW YOUR “LIST OF VARIABLES & CATEGORIES”) =====================
+# Removed from UI: Bilangan Tanggungan, Deposit, Skim
 OPTIONS = {
     "Jantina": ["Lelaki", "Perempuan"],
     "Warganegara": ["Malaysian", "Non-Malaysian"],
@@ -236,16 +237,13 @@ OPTIONS = {
     "Tahap Pendidikan": ["SPM dan ke bawah", "Undergraduate", "Postgraduate"],
     "Pekerjaan": ["Tidak bekerja", "Bekerja sendiri", "Lain-lain", "Pekerja Kerajaan", "Pekerja Swasta", "Pesara"],
     "Bilangan Isi Rumah": ["Kurang dari 2 orang", "3 - 4 orang", "Lebih 5 orang"],
-    "Bilangan Tanggungan": ["Kurang dari 2 orang", "3 - 4 orang", "Lebih 5 orang"],
     "Jenis Penyewaan": ["Rumah", "Bilik"],
     "Jenis Rumah Sewa": ["Flat", "Condominium", "Lain-lain", "Pangsapuri", "Rumah 1 unit", "Rumah Teres"],
     "Jenis Kelengkapan Perabot": ["Tiada perabot", "Perabot penuh", "Perabot separa"],
-    "Deposit": ["Tiada deposit", "1 + 1", "2 + 1", "3 + 1"],
     "Tempoh Menyewa": ["Kurang 2 tahun", "3 - 5 tahun", "Lebih 6 tahun"],
-    "Skim": ["Ya", "Tidak"],
 }
 
-# --- Display (bilingual) for dropdown options (English first) ---
+# --- Display (bilingual) for dropdown options ---
 DISPLAY = {
     "Jantina": {"Lelaki": "Male (Lelaki)", "Perempuan": "Female (Perempuan)"},
     "Warganegara": {
@@ -287,11 +285,6 @@ DISPLAY = {
         "3 - 4 orang": "3–4 people (3–4 orang)",
         "Lebih 5 orang": "5+ people (Lebih 5 orang)",
     },
-    "Bilangan Tanggungan": {
-        "Kurang dari 2 orang": "Less than 2 (Kurang dari 2)",
-        "3 - 4 orang": "3–4 (3–4 orang)",
-        "Lebih 5 orang": "More than 5 (Lebih 5)",
-    },
     "Jenis Penyewaan": {"Rumah": "Whole unit/house (Rumah)", "Bilik": "Room (Bilik)"},
     "Jenis Rumah Sewa": {
         "Flat": "Flat (Flat)",
@@ -306,18 +299,11 @@ DISPLAY = {
         "Perabot penuh": "Fully furnished (Perabot penuh)",
         "Perabot separa": "Partly furnished (Perabot separa)",
     },
-    "Deposit": {
-        "Tiada deposit": "No deposit (Tiada deposit)",
-        "1 + 1": "1+1 deposit (1+1)",
-        "2 + 1": "2+1 deposit (2+1)",
-        "3 + 1": "3+1 deposit (3+1)",
-    },
     "Tempoh Menyewa": {
         "Kurang 2 tahun": "Less than 2 years (Kurang 2 tahun)",
         "3 - 5 tahun": "3–5 years (3–5 tahun)",
         "Lebih 6 tahun": "More than 6 years (Lebih 6 tahun)",
     },
-    "Skim": {"Ya": "Yes (Ya)", "Tidak": "No (Tidak)"},
 }
 
 
@@ -340,17 +326,16 @@ def fmt(field: str):
     return lambda x: m.get(x, str(x))
 
 
-# -------------------- MODEL INPUTS (SIGNIFICANT ONLY) --------------------
+# -------------------- MODEL INPUTS (ONLY VARIABLES IN COEF) --------------------
 def build_inputs(
     edu_label: str,
     job_label: str,
+    bil_isi_rumah_label: str,
     jenis_penyewaan_label: str,
     jenis_rumah_sewa_label: str,
     perabot_label: str,
-    deposit_label: str,
     tempoh_label: str,
 ) -> dict:
-    # Only significant variables + constant
     inp = {k: 0.0 for k in COEF.keys()}
     inp["Constant"] = 1.0
 
@@ -363,6 +348,10 @@ def build_inputs(
         inp["Pekerjaan=Pekerja Kerajaan(1)"] = 1.0
     elif job_label == "Pekerja Swasta":
         inp["Pekerjaan=Pekerja Swasta(1)"] = 1.0
+
+    # Household size (only significant one in your table: 5+)
+    if bil_isi_rumah_label == "Lebih 5 orang":
+        inp["Bilangan Isi Rumah=Lebih 5 orang(1)"] = 1.0
 
     # Type of rental (Rumah/Bilik)
     if jenis_penyewaan_label == "Bilik":
@@ -382,11 +371,7 @@ def build_inputs(
     if perabot_label == "Perabot separa":
         inp["Jenis kelengkapan perabot=Berperabot separa(1)"] = 1.0
 
-    # Deposit (only 2+1 significant)
-    if deposit_label == "2 + 1":
-        inp["deposit_2_1(1)"] = 1.0
-
-    # Renting duration (only 3-5 and 6+ significant)
+    # Renting duration (both are significant in your new table)
     if tempoh_label == "3 - 5 tahun":
         inp["Berapa lama anda telah menyewa rumah=3-5 tahun(1)"] = 1.0
     elif tempoh_label == "Lebih 6 tahun":
@@ -409,6 +394,7 @@ def compute_table(inputs: dict):
 # ===================== GOOGLE SHEETS (APPEND ROW) =====================
 SHEET_ID_DEFAULT = "1sv9VlXO07K-wcmNCRVO5fvZcrzGcI4gncxfFVR73wxc"  # your sheet id
 
+# Removed: bilangan_tanggungan, deposit, skim (you said spreadsheet already removed these 3 cols)
 SHEET_COLS = [
     "timestamp",
     "jantina",
@@ -419,13 +405,10 @@ SHEET_COLS = [
     "tahap_pendidikan",
     "pekerjaan",
     "bil_isi_rumah",
-    "bil_tanggungan",
     "jenis_penyewaan",
     "jenis_rumah_sewa",
     "jenis_perabot",
-    "deposit",
     "tempoh_menyewa",
-    "skim",
     "income_rm",
     "rent_rm",
     "ratio_threshold",
@@ -746,10 +729,7 @@ with left:
             index=0,
             format_func=fmt("Jantina"),
             label_visibility="collapsed",
-            help=help_text(
-                "Select the respondent's gender.",
-                "Pilih jantina responden.",
-            ),
+            help=help_text("Select gender.", "Pilih jantina."),
         )
 
         st.markdown(label_html("Nationality", "Warganegara"), unsafe_allow_html=True)
@@ -759,10 +739,7 @@ with left:
             index=0,
             format_func=fmt("Warganegara"),
             label_visibility="collapsed",
-            help=help_text(
-                "Select whether the respondent is Malaysian or non-Malaysian.",
-                "Pilih sama ada responden warganegara Malaysia atau bukan warganegara.",
-            ),
+            help=help_text("Malaysian or non-Malaysian.", "Warganegara Malaysia atau bukan."),
         )
 
         st.markdown(label_html("Ethnicity", "Bangsa"), unsafe_allow_html=True)
@@ -772,10 +749,7 @@ with left:
             index=0,
             format_func=fmt("Bangsa"),
             label_visibility="collapsed",
-            help=help_text(
-                "Choose the ethnicity category.",
-                "Pilih kategori bangsa.",
-            ),
+            help=help_text("Choose ethnicity category.", "Pilih kategori bangsa."),
         )
 
         st.markdown(label_html("Religion", "Agama"), unsafe_allow_html=True)
@@ -785,10 +759,7 @@ with left:
             index=0,
             format_func=fmt("Agama"),
             label_visibility="collapsed",
-            help=help_text(
-                "Choose the religion category.",
-                "Pilih kategori agama.",
-            ),
+            help=help_text("Choose religion category.", "Pilih kategori agama."),
         )
 
         st.markdown(label_html("Marital status", "Status perkahwinan"), unsafe_allow_html=True)
@@ -798,10 +769,7 @@ with left:
             index=0,
             format_func=fmt("Status Perkahwinan"),
             label_visibility="collapsed",
-            help=help_text(
-                "Select marital status.",
-                "Pilih status perkahwinan.",
-            ),
+            help=help_text("Select marital status.", "Pilih status perkahwinan."),
         )
 
         st.markdown(label_html("Education level", "Tahap pendidikan"), unsafe_allow_html=True)
@@ -811,10 +779,7 @@ with left:
             index=0,
             format_func=fmt("Tahap Pendidikan"),
             label_visibility="collapsed",
-            help=help_text(
-                "Select the highest education level.",
-                "Pilih tahap pendidikan tertinggi.",
-            ),
+            help=help_text("Highest education level.", "Tahap pendidikan tertinggi."),
         )
 
     with colB:
@@ -825,10 +790,7 @@ with left:
             index=0,
             format_func=fmt("Pekerjaan"),
             label_visibility="collapsed",
-            help=help_text(
-                "Select the occupation category.",
-                "Pilih kategori pekerjaan.",
-            ),
+            help=help_text("Select occupation.", "Pilih pekerjaan."),
         )
 
         st.markdown(label_html("Household size", "Bilangan isi rumah"), unsafe_allow_html=True)
@@ -839,21 +801,8 @@ with left:
             format_func=fmt("Bilangan Isi Rumah"),
             label_visibility="collapsed",
             help=help_text(
-                "Total number of people living in the household.",
+                "Total people living in the household.",
                 "Jumlah orang yang tinggal dalam isi rumah.",
-            ),
-        )
-
-        st.markdown(label_html("Number of dependents", "Bilangan tanggungan"), unsafe_allow_html=True)
-        bil_tanggungan = st.selectbox(
-            "dep_hidden",
-            OPTIONS["Bilangan Tanggungan"],
-            index=0,
-            format_func=fmt("Bilangan Tanggungan"),
-            label_visibility="collapsed",
-            help=help_text(
-                "Number of dependents supported financially.",
-                "Bilangan tanggungan yang ditanggung dari segi kewangan.",
             ),
         )
 
@@ -865,8 +814,8 @@ with left:
             format_func=fmt("Jenis Penyewaan"),
             label_visibility="collapsed",
             help=help_text(
-                "Choose whether renting a whole unit/house or just a room.",
-                "Pilih sama ada menyewa rumah/unit atau bilik sahaja.",
+                "Rent whole unit/house or just a room.",
+                "Sewa rumah/unit atau bilik sahaja.",
             ),
         )
 
@@ -878,8 +827,8 @@ with left:
             format_func=fmt("Jenis Rumah Sewa"),
             label_visibility="collapsed",
             help=help_text(
-                "Select the rental housing type (e.g., flat/condo/apartment/terrace).",
-                "Pilih jenis rumah sewa (cth: flat/kondo/pangsapuri/teres).",
+                "Select rental housing type (flat/condo/apartment/terrace).",
+                "Pilih jenis rumah sewa (flat/kondo/pangsapuri/teres).",
             ),
         )
 
@@ -890,23 +839,7 @@ with left:
             index=0,
             format_func=fmt("Jenis Kelengkapan Perabot"),
             label_visibility="collapsed",
-            help=help_text(
-                "Indicate the furnishing level of the rental unit.",
-                "Nyatakan tahap perabot bagi rumah sewa.",
-            ),
-        )
-
-        st.markdown(label_html("Deposit", "Deposit"), unsafe_allow_html=True)
-        deposit = st.selectbox(
-            "deposit_hidden",
-            OPTIONS["Deposit"],
-            index=0,
-            format_func=fmt("Deposit"),
-            label_visibility="collapsed",
-            help=help_text(
-                "Choose the deposit arrangement (example: 2+1 = 2 months deposit + 1 month utility).",
-                "Pilih jenis deposit (cth: 2+1 = 2 bulan deposit + 1 bulan utiliti).",
-            ),
+            help=help_text("Furnishing level of the unit.", "Tahap perabot rumah sewa."),
         )
 
         st.markdown(label_html("Years renting", "Tempoh menyewa"), unsafe_allow_html=True)
@@ -918,20 +851,7 @@ with left:
             label_visibility="collapsed",
             help=help_text(
                 "How long the respondent has been renting.",
-                "Tempoh responden telah menyewa.",
-            ),
-        )
-
-        st.markdown(label_html("Know affordable rental scheme?", "Tahu skim mampu sewa?"), unsafe_allow_html=True)
-        skim = st.selectbox(
-            "skim_hidden",
-            OPTIONS["Skim"],
-            index=0,
-            format_func=fmt("Skim"),
-            label_visibility="collapsed",
-            help=help_text(
-                "Whether the respondent is aware of affordable rental schemes.",
-                "Sama ada responden tahu skim mampu sewa.",
+                "Berapa lama responden telah menyewa.",
             ),
         )
 
@@ -948,8 +868,8 @@ with left:
             step=100.0,
             label_visibility="collapsed",
             help=help_text(
-                "Enter total monthly household income in RM.",
-                "Masukkan jumlah pendapatan isi rumah bulanan (RM).",
+                "Total household income per month (RM).",
+                "Jumlah pendapatan isi rumah sebulan (RM).",
             ),
         )
     with c2:
@@ -961,8 +881,8 @@ with left:
             step=50.0,
             label_visibility="collapsed",
             help=help_text(
-                "Enter the monthly rent amount in RM.",
-                "Masukkan jumlah sewa bulanan (RM).",
+                "Rent paid every month (RM).",
+                "Jumlah sewa yang dibayar setiap bulan (RM).",
             ),
         )
     with c3:
@@ -975,7 +895,7 @@ with left:
             step=0.01,
             label_visibility="collapsed",
             help=help_text(
-                "Maximum recommended rent share of income (example: 0.38 = 38%).",
+                "Max recommended rent share of income (e.g., 0.38 = 38%).",
                 "Had maksimum sewa berbanding pendapatan (cth: 0.38 = 38%).",
             ),
         )
@@ -1010,10 +930,10 @@ if run:
     inputs = build_inputs(
         edu_label=tahap_pendidikan,
         job_label=pekerjaan,
+        bil_isi_rumah_label=bil_isi_rumah,
         jenis_penyewaan_label=jenis_penyewaan,
         jenis_rumah_sewa_label=jenis_rumah_sewa,
         perabot_label=jenis_perabot,
-        deposit_label=deposit,
         tempoh_label=tempoh_menyewa,
     )
 
@@ -1054,13 +974,10 @@ if run:
                 "tahap_pendidikan": tahap_pendidikan,
                 "pekerjaan": pekerjaan,
                 "bil_isi_rumah": bil_isi_rumah,
-                "bil_tanggungan": bil_tanggungan,
                 "jenis_penyewaan": jenis_penyewaan,
                 "jenis_rumah_sewa": jenis_rumah_sewa,
                 "jenis_perabot": jenis_perabot,
-                "deposit": deposit,
                 "tempoh_menyewa": tempoh_menyewa,
-                "skim": skim,
                 "income_rm": float(income),
                 "rent_rm": float(rent),
                 "ratio_threshold": float(ratio),
